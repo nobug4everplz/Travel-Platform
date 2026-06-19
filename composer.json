@@ -1,0 +1,19 @@
+{
+    "name": "travel-platform/php-mysql",
+    "description": "A PHP 8 and MySQL travel platform using PDO.",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.0",
+        "ext-filter": "*",
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*",
+        "ext-session": "*",
+        "phpmailer/phpmailer": "^6.10"
+    },
+    "scripts": {
+        "serve": "php -S localhost:8000 -t public public/router.php",
+        "seed": "php seed.php",
+        "lint": "php -l public/router.php && php -l public/index.php && php -l actions/login.php"
+    }
+}
