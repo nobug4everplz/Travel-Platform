@@ -98,6 +98,28 @@ function dashboard_path(string $role): string
     };
 }
 
+function input_float(array $source, string $key, ?float $min = null, ?float $max = null): ?float
+{
+    if (!isset($source[$key]) || $source[$key] === '') {
+        return null;
+    }
+
+    $value = filter_var($source[$key], FILTER_VALIDATE_FLOAT);
+    if ($value === false) {
+        return null;
+    }
+
+    if ($min !== null && $value < $min) {
+        return null;
+    }
+
+    if ($max !== null && $value > $max) {
+        return null;
+    }
+
+    return $value;
+}
+
 function format_rating(?string $rating): string
 {
     return $rating === null ? '尚無評分' : number_format((float) $rating, 1) . ' / 5';
