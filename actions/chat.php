@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/ai.php';
+require_once __DIR__ . '/../lib/ai-context.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -38,9 +39,9 @@ if (count($window) >= 10) {
 $window[] = $now;
 $_SESSION['chat_rate_limit'] = $window;
 
-$message = trim((string) ($input['message'] ?? ''));
-$page    = trim((string) ($input['page'] ?? ''));
-$context = trim((string) ($input['context'] ?? ''));
+$message  = trim((string) ($input['message'] ?? ''));
+$pageType = trim((string) ($input['page'] ?? ''));
+$tripData = isset($input['trip_data']) && is_array($input['trip_data']) ? $input['trip_data'] : null;
 
 if ($message === '') {
     http_response_code(400);
@@ -48,17 +49,7 @@ if ($message === '') {
     exit;
 }
 
-$systemPrompt = '你是一個旅遊平台 AI 助手，幫助使用者規劃行程、推薦景點與餐廳。請用繁體中文回答，語氣友善專業。';
-if ($page !== '') {
-    $systemPrompt .= '
-
-使用者目前在頁面：' . $page;
-}
-if ($context !== '') {
-    $systemPrompt .= '
-
-頁面脈絡：' . $context;
-}
+$systemPrompt = build_system_prompt($pageType, $user, $tripData);
 
 $result = chat($systemPrompt, $message);
 
