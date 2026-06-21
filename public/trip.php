@@ -31,6 +31,13 @@ $isFavorited = $user && in_array($user['role'], ['traveler', 'planner'], true)
     : false;
 $myReview = $isTraveler ? get_user_review_for_trip((int) $user['id'], $tripId) : null;
 
+require_once __DIR__ . '/../lib/spot-actions.php';
+$spots = get_trip_spots($tripId);
+$hasMap = $trip['latitude'] && $trip['longitude'];
+if ($hasMap) {
+    $loadMap = true;
+}
+
 $pageTitle = $trip['title'];
 require __DIR__ . '/../partials/header.php';
 ?>
@@ -79,6 +86,69 @@ require __DIR__ . '/../partials/header.php';
             </div>
         </div>
     </div>
+</section>
+<section class="panel">
+    <div class="section-heading"><div><p class="eyebrow">Itinerary</p><h2>行程景點</h2></div></div>
+
+    <?php if ($hasMap): ?>
+    <div id="trip-map" style="height:400px;border-radius:12px;overflow:hidden;margin-bottom:1rem;"></div>
+    <script>
+    (function() {
+        var map = initMap('trip-map');
+        var markers = [];
+
+        // 行程位置 marker
+        var trip = <?= json_encode([
+            'id' => (int) $trip['id'],
+            'title' => $trip['title'],
+            'latitude' => $trip['latitude'],
+            'longitude' => $trip['longitude'],
+            'average_rating' => $trip['average_rating'],
+            'summary' => $trip['summary'],
+        ], JSON_UNESCAPED_UNICODE) ?>;
+        var tm = addTripMarker(map, trip);
+        if (tm) markers.push(tm);
+
+        // 景點 markers
+        var spots = <?= json_encode($spots, JSON_UNESCAPED_UNICODE) ?>;
+        var spotMarkers = [];
+        for (var i = 0; i < spots.length; i++) {
+            var sm = addSpotMarker(map, spots[i], i);
+            if (sm) spotMarkers.push(sm);
+        }
+        markers = markers.concat(spotMarkers);
+
+        // 景點連線
+        connectSpotsPolyline(map, spots);
+
+        if (markers.length > 0) fitAllMarkers(map, markers);
+    })();
+    </script>
+    <?php endif; ?>
+
+    <?php if ($spots): ?>
+    <div class="grid spots-list">
+        <?php foreach ($spots as $idx => $spot): ?>
+        <article class="card"><div class="card-body">
+            <span class="badge"><?= $idx + 1 ?></span>
+            <h3><?= e($spot['name']) ?></h3>
+            <?php if ($spot['address']): ?>
+            <p class="muted"><?= e($spot['address']) ?></p>
+            <?php endif; ?>
+            <?php if ($spot['notes']): ?>
+            <p><?= nl2br(e($spot['notes'])) ?></p>
+            <?php endif; ?>
+            <?php if ($spot['google_maps_url']): ?>
+            <div class="actions">
+                <a class="button small" href="<?= e($spot['google_maps_url']) ?>" target="_blank" rel="noopener">🗺 Google Maps</a>
+            </div>
+            <?php endif; ?>
+        </div></article>
+        <?php endforeach; ?>
+    </div>
+    <?php else: ?>
+    <div class="empty-state">這個行程尚未新增景點。</div>
+    <?php endif; ?>
 </section>
 <section class="panel">
     <div class="section-heading"><div><p class="eyebrow">Reviews</p><h2>行程評論</h2></div></div>
