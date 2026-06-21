@@ -12,6 +12,8 @@ declare(strict_types=1);
  */
 function build_system_prompt(string $pageType, ?array $user, ?array $tripData = null): string
 {
+    $user = $user ?? [];
+
     $roleLabel = match ($user['role'] ?? '') {
         'traveler' => '旅人',
         'planner'  => '規劃師',
@@ -45,9 +47,10 @@ function build_system_prompt(string $pageType, ?array $user, ?array $tripData = 
         case 'trip':
             $prompt .= "行程頁面 — 使用者在查看一個具體行程。\n";
             if ($tripData) {
-                $t = $tripData['title'] ?? '';
-                $s = $tripData['summary'] ?? '';
+                $t = sanitize_trip_text($tripData['title'] ?? '');
+                $s = sanitize_trip_text($tripData['summary'] ?? '');
                 $spots = $tripData['spots'] ?? null;
+                $prompt .= "--- 以下為行程資料 ---\n";
                 if ($t !== '') {
                     $prompt .= "行程名稱：{$t}\n";
                 }
@@ -55,9 +58,10 @@ function build_system_prompt(string $pageType, ?array $user, ?array $tripData = 
                     $prompt .= "行程摘要：{$s}\n";
                 }
                 if (is_array($spots) && $spots !== []) {
-                    $names = array_column($spots, 'name');
+                    $names = array_map('sanitize_trip_text', array_column($spots, 'name'));
                     $prompt .= '包含景點：' . implode('、', $names) . "\n";
                 }
+                $prompt .= "--- 行程資料結束 ---\n";
             }
             $prompt .= '你可以協助深入了解這個行程，或提供相關旅遊建議。';
             break;
@@ -65,14 +69,16 @@ function build_system_prompt(string $pageType, ?array $user, ?array $tripData = 
         case 'editor':
             $prompt .= "行程編輯器 — 使用者在撰寫或編輯行程。\n";
             if ($tripData) {
-                $t = $tripData['title'] ?? '';
-                $s = $tripData['summary'] ?? '';
+                $t = sanitize_trip_text($tripData['title'] ?? '');
+                $s = sanitize_trip_text($tripData['summary'] ?? '');
+                $prompt .= "--- 以下為行程資料 ---\n";
                 if ($t !== '') {
                     $prompt .= "行程名稱：{$t}\n";
                 }
                 if ($s !== '') {
                     $prompt .= "目前已填寫摘要：{$s}\n";
                 }
+                $prompt .= "--- 行程資料結束 ---\n";
             }
             $prompt .= "你可以協助：\n"
                 . "- 撰寫或潤飾行程摘要\n"
@@ -102,4 +108,16 @@ function build_system_prompt(string $pageType, ?array $user, ?array $tripData = 
         . "- 景點推薦以現實存在的地點為基礎";
 
     return $prompt;
+}
+
+/**
+ * Sanitize user-controlled text before embedding into prompt.
+ * Strips newlines, trims, truncates to prevent injection.
+ */
+function sanitize_trip_text(?string $text, int $maxLen = 200): string
+{
+    if ($text === null || $text === '') {
+        return '';
+    }
+    return trim(str_replace(array("\r\n", "\n"), ' ', mb_substr($text, 0, $maxLen)));
 }

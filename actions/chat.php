@@ -41,6 +41,8 @@ $_SESSION['chat_rate_limit'] = $window;
 
 $message  = trim((string) ($input['message'] ?? ''));
 $pageType = trim((string) ($input['page'] ?? ''));
+$validPages = ['home', 'trip', 'editor', 'planner_dashboard', 'traveler_dashboard'];
+$pageType = in_array($pageType, $validPages, true) ? $pageType : 'home';
 $tripData = isset($input['trip_data']) && is_array($input['trip_data']) ? $input['trip_data'] : null;
 
 if ($message === '') {
