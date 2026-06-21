@@ -11,13 +11,14 @@ function get_public_trips(?string $query = null, int $limit = 12): array
 
     if ($query !== null && trim($query) !== '') {
         $like = '%' . trim($query) . '%';
-        $where .= ' AND (t.title LIKE ? OR t.summary LIKE ? OR u.name LIKE ?)';
-        $params = [$like, $like, $like];
+        $where .= ' AND (t.title LIKE ? OR t.summary LIKE ? OR u.name LIKE ? OR t.address LIKE ? OR ts.name LIKE ?)';
+        $params = [$like, $like, $like, $like, $like];
     }
 
-    $sql = "SELECT t.*, u.id AS author_id, u.email AS author_email, u.name AS author_name, u.avatar_url AS author_avatar
+    $sql = "SELECT DISTINCT t.*, u.id AS author_id, u.email AS author_email, u.name AS author_name, u.avatar_url AS author_avatar
             FROM trips t
             JOIN users u ON u.id = t.author_id
+            LEFT JOIN trip_spots ts ON ts.trip_id = t.id
             WHERE {$where}
             ORDER BY t.updated_at DESC
             LIMIT {$limit}";

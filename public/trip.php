@@ -39,6 +39,8 @@ if ($hasMap) {
 }
 
 $pageTitle = $trip['title'];
+$pageType = 'trip';
+$bodyDataAttrs = 'data-trip-id="' . (int) $trip['id'] . '" data-trip-title="' . e($trip['title']) . '"';
 require __DIR__ . '/../partials/header.php';
 ?>
 <section class="panel">
@@ -88,12 +90,16 @@ require __DIR__ . '/../partials/header.php';
     </div>
 </section>
 <section class="panel">
-    <div class="section-heading"><div><p class="eyebrow">Itinerary</p><h2>行程景點</h2></div></div>
+    <div class="section-heading">
+        <div><p class="eyebrow">Itinerary</p><h2>行程景點</h2></div>
+        <button class="button small" onclick="var c=this.parentElement.parentElement.querySelector('.collapse-wrap');c.style.display=c.style.display==='none'?'':'none';this.textContent=c.style.display==='none'?'展開':'收合'" type="button">收合</button>
+    </div>
+    <div class="collapse-wrap">
 
     <?php if ($hasMap): ?>
-    <div id="trip-map" style="height:400px;border-radius:12px;overflow:hidden;margin-bottom:1rem;"></div>
+    <div id="trip-map" style="height:300px;border-radius:12px;overflow:hidden;margin-bottom:1rem;"></div>
     <script>
-    (function() {
+    document.addEventListener('DOMContentLoaded', function() {
         var map = initMap('trip-map');
         var markers = [];
 
@@ -122,12 +128,12 @@ require __DIR__ . '/../partials/header.php';
         connectSpotsPolyline(map, spots);
 
         if (markers.length > 0) fitAllMarkers(map, markers);
-    })();
+    });
     </script>
     <?php endif; ?>
 
     <?php if ($spots): ?>
-    <div class="grid spots-list">
+    <div class="grid two spots-list">
         <?php foreach ($spots as $idx => $spot): ?>
         <article class="card"><div class="card-body">
             <span class="badge"><?= $idx + 1 ?></span>
@@ -149,6 +155,7 @@ require __DIR__ . '/../partials/header.php';
     <?php else: ?>
     <div class="empty-state">這個行程尚未新增景點。</div>
     <?php endif; ?>
+    </div>
 </section>
 <section class="panel">
     <div class="section-heading"><div><p class="eyebrow">Reviews</p><h2>行程評論</h2></div></div>

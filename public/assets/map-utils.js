@@ -40,15 +40,16 @@ function addTripMarker(map, trip) {
   if (isNaN(lat) || isNaN(lng)) return;
 
   var marker = L.marker([lat, lng]).addTo(map);
-  var rating =
-    trip.average_rating != null ? parseFloat(trip.average_rating).toFixed(1) : 'N/A';
+  var rating = trip.average_rating != null
+    ? '\u2605 ' + parseFloat(trip.average_rating).toFixed(1) + ' / 5'
+    : '\u5c1a\u7121\u8a55\u5206';
   var popup = document.createElement('div');
   var link = document.createElement('a');
   link.href = '/trip.php?id=' + encodeURIComponent(trip.id);
-  link.textContent = '查看詳情';
+  link.textContent = '\u67e5\u770b\u8a73\u60c5';
   popup.innerHTML =
     '<strong>' + escapeHtml(trip.title || '') + '</strong><br>' +
-    '<span>評分: ' + rating + '</span><br>' +
+    '<span>' + rating + '</span><br>' +
     '<p>' + escapeHtml((trip.summary || '').substring(0, 50)) + '</p>';
   popup.appendChild(link);
   marker.bindPopup(popup);

@@ -222,6 +222,48 @@ img {
     margin: 0;
 }
 
+/* ───── Editor spots ───── */
+.spot-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    padding: 14px;
+}
+.spot-handle {
+    cursor: grab;
+    font-size: 1.4em;
+    line-height: 1;
+    padding: 6px 4px;
+    user-select: none;
+    color: var(--muted);
+    flex-shrink: 0;
+}
+.spot-handle:active { cursor: grabbing; }
+.spot-fields {
+    display: grid;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+.spot-fields input,
+.spot-fields textarea {
+    width: 100%;
+    box-sizing: border-box;
+}
+.spot-coords {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.spot-coords input {
+    width: 120px;
+}
+#spots-container {
+    margin-bottom: 12px;
+}
+
 .cover {
     aspect-ratio: 16 / 9;
     background: var(--surface-muted);

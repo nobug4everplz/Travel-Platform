@@ -118,7 +118,26 @@ $latestReviewsStmt = pdo()->prepare(
 $latestReviewsStmt->execute([$user['id']]);
 $latestReviews = $latestReviewsStmt->fetchAll();
 
+// ───── Hot spots ─────
+$hotSpotsStmt = pdo()->prepare(
+    'SELECT ts.name, ts.address, COUNT(DISTINCT ts.trip_id) AS trip_count
+     FROM trip_spots ts
+     JOIN trips t ON t.id = ts.trip_id
+     WHERE t.author_id = ? AND t.is_published = 1
+     GROUP BY ts.name, ts.address
+     ORDER BY trip_count DESC, ts.name ASC
+     LIMIT 10'
+);
+$hotSpotsStmt->execute([$user['id']]);
+$hotSpots = $hotSpotsStmt->fetchAll();
+
 $pageTitle = '規劃師工作台';
+$pageType = 'planner_dashboard';
+
+// Map: published trips with coordinates
+$mapPublished = array_filter($published, fn($t) => !empty($t['latitude']) && !empty($t['longitude']));
+$loadMap = !empty($mapPublished);
+
 require __DIR__ . '/../partials/header.php';
 ?>
 <section class="page-heading">
@@ -149,6 +168,33 @@ require __DIR__ . '/../partials/header.php';
         </div>
     </div>
 </section>
+
+<?php if (!empty($mapPublished)): ?>
+<section class="panel">
+    <div class="section-heading"><div><p class="eyebrow">Map</p><h2>已發布行程地圖</h2></div></div>
+    <div id="planner-trip-map" style="height: 350px; border-radius: 12px;"></div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var map = initMap('planner-trip-map');
+        var markers = [];
+        var trips = <?= json_encode(array_map(fn($t) => [
+            'id' => (int)$t['id'],
+            'title' => $t['title'],
+            'latitude' => $t['latitude'],
+            'longitude' => $t['longitude'],
+            'average_rating' => $t['average_rating'],
+            'summary' => $t['summary'],
+        ], array_values($mapPublished)), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        trips.forEach(function(trip) {
+            var m = addTripMarker(map, trip);
+            if (m) markers.push(m);
+        });
+        if (markers.length > 1) fitAllMarkers(map, markers);
+    });
+    </script>
+</section>
+<?php endif; ?>
+
 <section class="panel" aria-labelledby="planner-insights-title">
     <div class="section-heading">
         <div>
@@ -192,6 +238,29 @@ require __DIR__ . '/../partials/header.php';
         </div>
     </div>
 </section>
+
+<?php if ($hotSpots): ?>
+<section class="panel">
+    <div class="section-heading"><div><p class="eyebrow">Popular Spots</p><h2>熱門景點</h2></div></div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>景點名稱</th><th>地址</th><th>使用次數</th></tr>
+            </thead>
+            <tbody>
+                <?php foreach ($hotSpots as $spot): ?>
+                    <tr>
+                        <td><strong><?= e($spot['name']) ?></strong></td>
+                        <td class="muted"><?= e($spot['address'] ?? '-') ?></td>
+                        <td><span class="badge"><?= (int) $spot['trip_count'] ?> 次</span></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</section>
+<?php endif; ?>
+
 <section class="panel">
     <div class="section-heading"><div><p class="eyebrow">Reviews</p><h2>最新評論</h2></div></div>
     <?php if (!$latestReviews): ?>
