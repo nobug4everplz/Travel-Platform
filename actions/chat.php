@@ -146,6 +146,17 @@ for ($round = 0; $round < $maxRounds; $round++) {
     // Continue loop for next round
 }
 
+// ───── Scan for fill_editor tool call to forward to frontend ─────
+$fillEditorAction = null;
+foreach ($toolCallsUsed as $tc) {
+    if ($tc['name'] === 'fill_editor' && empty($tc['arguments']['error'])) {
+        $fillEditorAction = [
+            'trip_id' => $tc['arguments']['trip_id'] ?? null,
+            'content' => $tc['arguments']['content'] ?? null,
+        ];
+    }
+}
+
 // If max rounds reached without final text, use the last accumulated reply
 if ($reply === null && $loopError === null) {
     $reply = '已超過最大處理次數，請簡化你的問題後重新詢問。';
@@ -157,8 +168,14 @@ if ($loopError !== null) {
 }
 
 header('Content-Type: application/json');
-echo json_encode([
+$response = [
     'reply'           => $reply,
     'tool_calls'      => $toolCallsUsed,
     'error'           => $loopError,
-]);
+];
+if ($fillEditorAction) {
+    $response['_action'] = 'fill_editor';
+    $response['trip_id'] = $fillEditorAction['trip_id'];
+    $response['content'] = $fillEditorAction['content'];
+}
+echo json_encode($response, JSON_UNESCAPED_UNICODE);

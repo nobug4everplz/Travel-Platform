@@ -291,7 +291,7 @@
     if (url.indexOf('/planner-dashboard') !== -1) return 'planner_dashboard';
     if (url.indexOf('/traveler-dashboard') !== -1) return 'traveler_dashboard';
     if (url.indexOf('/editor') !== -1) return 'editor';
-    if (url.indexOf('/trip/') !== -1) return 'trip';
+    if (url.indexOf('/trip.php') !== -1 || url.indexOf('/trip?') !== -1) return 'trip';
     return 'home';
   }
 
