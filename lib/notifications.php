@@ -13,10 +13,10 @@ function ensure_notification_preferences(array $user): void
     $stmt = pdo()->prepare(
         'INSERT INTO notification_preferences
             (user_id, popular_digest_enabled, planner_digest_enabled, winback_enabled)
-         VALUES (?, 1, ?, 1)
+         VALUES (?, true, ?, true)
          ON CONFLICT (user_id) DO NOTHING'
     );
-    $stmt->execute([(int) $user['id'], $user['role'] === 'planner' ? 1 : 0]);
+    $stmt->execute([(int) $user['id'], $user['role'] === 'planner' ? true : false]);
 }
 
 function get_notification_preferences(array $user): ?array
