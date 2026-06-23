@@ -87,7 +87,7 @@ try {
         trip_id INT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
         user_id INT NOT NULL REFERENCES users(id),
         status VARCHAR(20) DEFAULT 'active',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(trip_id, user_id)
     )");
 
@@ -321,6 +321,16 @@ try {
     BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trip_participations' AND column_name='status') THEN
             ALTER TABLE trip_participations ADD COLUMN status VARCHAR(20) DEFAULT 'active';
+        END IF;
+    END $$");
+
+    // trip_participations: rename created_at -> joined_at (Phase 3.5)
+    $db->exec("
+    DO $$
+    BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trip_participations' AND column_name='created_at')
+           AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trip_participations' AND column_name='joined_at') THEN
+            ALTER TABLE trip_participations RENAME COLUMN created_at TO joined_at;
         END IF;
     END $$");
 
