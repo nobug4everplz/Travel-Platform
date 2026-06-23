@@ -34,6 +34,7 @@ $myReview = $isTraveler ? get_user_review_for_trip((int) $user['id'], $tripId) :
 require_once __DIR__ . '/../lib/spot-actions.php';
 require_once __DIR__ . '/../lib/trip-gear.php';
 require_once __DIR__ . '/../lib/weather.php';
+require_once __DIR__ . '/../lib/currency.php';
 $spots = get_trip_spots($tripId);
 $gear = get_trip_gear($tripId);
 $hasGear = count($gear) > 0;
@@ -62,6 +63,9 @@ require __DIR__ . '/../partials/header.php';
             <p class="muted"><?= render_markdown_images($trip['summary'] ?: '這個行程尚未填寫摘要。') ?></p>
             <p class="meta">評分 <?= e(format_rating($trip['average_rating'])) ?>，<?= (int) $trip['review_count'] ?> 則評論</p>
             <p class="meta">規劃師 <a class="text-link" href="/planner.php?id=<?= (int) $trip['author_id'] ?>"><?= e($trip['author_name'] ?: $trip['author_email']) ?></a></p>
+            <?php if (!empty($trip['start_date'])): ?>
+                <div class="countdown" data-start-date="<?= e($trip['start_date']) ?>"></div>
+            <?php endif; ?>
             <div class="actions">
                 <?php if (!$user): ?>
                     <a class="button primary" href="/login.php">登入後互動</a>
@@ -89,10 +93,39 @@ require __DIR__ . '/../partials/header.php';
                         <span class="badge gray">管理員檢視</span>
                     <?php endif; ?>
                 <?php endif; ?>
+                <a class="button" href="/actions/export-pdf.php?id=<?= (int) $trip['id'] ?>">📥 下載行程手冊</a>
             </div>
         </div>
     </div>
 </section>
+
+<?php
+$budgetAmount = $trip['budget'] ?? null;
+$tripCurrency = $trip['currency'] ?? 'TWD';
+$showBudget = $budgetAmount !== null && (float) $budgetAmount > 0;
+
+if ($showBudget):
+    $destCurrency = guess_destination_currency($trip['address'] ?? null);
+    $hasConversion = $destCurrency !== null && $destCurrency !== $tripCurrency;
+    $converted = $hasConversion ? convert_currency((float) $budgetAmount, $tripCurrency, $destCurrency) : null;
+    $cacheTime = $hasConversion ? get_exchange_rate_cache_time() : null;
+?>
+<section class="panel">
+    <div class="section-heading"><div><p class="eyebrow">Budget</p><h2>行程預算</h2></div></div>
+    <p style="font-size:1.25rem;font-weight:600;">
+        <?= format_currency((float) $budgetAmount, $tripCurrency) ?>
+        <?php if ($hasConversion && $converted !== null): ?>
+            &nbsp;≈ <?= format_currency($converted, $destCurrency) ?>
+        <?php endif; ?>
+    </p>
+    <?php if ($cacheTime !== null): ?>
+        <p class="muted" style="font-size:13px;">匯率更新 <?= e($cacheTime) ?></p>
+    <?php elseif ($hasConversion): ?>
+        <p class="muted" style="font-size:13px;">匯率暫時無法取得</p>
+    <?php endif; ?>
+</section>
+<?php endif; ?>
+
 <section class="panel">
     <div class="section-heading">
         <div><p class="eyebrow">Itinerary</p><h2>行程景點</h2></div>
@@ -273,4 +306,44 @@ if (!empty($trip['address'])) {
         </div>
     <?php endif; ?>
 </section>
+<style>
+.countdown {
+    margin: 0.75rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    display: inline-block;
+}
+.countdown-past { color: #999; font-weight: 400; }
+.countdown-today { color: #10b981; background: #ecfdf5; }
+.countdown-soon { color: #d97706; background: #fffbeb; border: 1px solid #fde68a; }
+.countdown-far { color: #4f46e5; font-weight: 400; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function updateCountdowns() {
+        var els = document.querySelectorAll('.countdown[data-start-date]');
+        var now = new Date();
+        now.setHours(0, 0, 0, 0);
+        for (var i = 0; i < els.length; i++) {
+            var el = els[i];
+            var parts = el.getAttribute('data-start-date').split('-');
+            var startDate = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+            startDate.setHours(0, 0, 0, 0);
+            var diff = Math.round((startDate.getTime() - now.getTime()) / 86400000);
+            var text, cls;
+            if (diff < 0)       { text = '行程已出發';          cls = 'countdown-past'; }
+            else if (diff === 0){ text = '就是今天！🎉';         cls = 'countdown-today'; }
+            else if (diff <= 7) { text = '🔥 距離出發還有 ' + diff + ' 天'; cls = 'countdown-soon'; }
+            else if (diff <= 30){ text = '距離出發還有 ' + diff + ' 天';  cls = ''; }
+            else                { text = '距離出發還有 ' + diff + ' 天';  cls = 'countdown-far'; }
+            el.textContent = text;
+            el.className = 'countdown' + (cls ? ' ' + cls : '');
+        }
+    }
+    updateCountdowns();
+    setInterval(updateCountdowns, 60000);
+});
+</script>
 <?php require __DIR__ . '/../partials/footer.php'; ?>
