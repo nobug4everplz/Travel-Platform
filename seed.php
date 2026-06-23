@@ -60,11 +60,11 @@ $loginStmt = $db->prepare(
     'INSERT INTO login_events (user_id, logged_in_at, ip_address, user_agent, trusted_device_id, is_new_device)
      VALUES (?, ?, ?, ?, ?, ?)'
 );
-$loginStmt->execute([$userIds['traveler@example.com'], date('Y-m-d H:i:s', strtotime('-4 days')), '192.168.1.20', 'Seed Browser', $travelerDeviceId, 1]);
-$loginStmt->execute([$userIds['traveler@example.com'], date('Y-m-d H:i:s', strtotime('-1 day')), '192.168.1.20', 'Seed Browser', $travelerDeviceId, 0]);
-$loginStmt->execute([$userIds['planner@example.com'], date('Y-m-d H:i:s', strtotime('-2 days')), '192.168.1.30', 'Seed Browser', null, 1]);
-$loginStmt->execute([$userIds['planner@example.com'], date('Y-m-d H:i:s'), '192.168.1.30', 'Seed Browser', null, 0]);
-$loginStmt->execute([$userIds['admin@example.com'], date('Y-m-d H:i:s'), '127.0.0.1', 'Seed Browser', null, 1]);
+$loginStmt->execute([$userIds['traveler@example.com'], date('Y-m-d H:i:s', strtotime('-4 days')), '192.168.1.20', 'Seed Browser', $travelerDeviceId, true]);
+$loginStmt->execute([$userIds['traveler@example.com'], date('Y-m-d H:i:s', strtotime('-1 day')), '192.168.1.20', 'Seed Browser', $travelerDeviceId, false]);
+$loginStmt->execute([$userIds['planner@example.com'], date('Y-m-d H:i:s', strtotime('-2 days')), '192.168.1.30', 'Seed Browser', null, true]);
+$loginStmt->execute([$userIds['planner@example.com'], date('Y-m-d H:i:s'), '192.168.1.30', 'Seed Browser', null, false]);
+$loginStmt->execute([$userIds['admin@example.com'], date('Y-m-d H:i:s'), '127.0.0.1', 'Seed Browser', null, true]);
 
 $trips = [
     ['京都深度五日慢旅', 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1200&auto=format&fit=crop', '走訪老街、茶道體驗與私房庭園，適合第一次想慢慢認識京都的旅人。', 1, $userIds['planner@example.com']],
