@@ -54,7 +54,7 @@ function get_top_trips_by_followed_planners(int $userId, array $exclude, int $li
             FROM trips t
             JOIN users u ON u.id = t.author_id
             JOIN favorite_planners fp ON fp.planner_id = t.author_id
-            WHERE t.is_published = 1
+            WHERE t.is_published = true
               AND fp.traveler_id = ?';
 
     $params = [$userId];
@@ -83,7 +83,7 @@ function get_top_public_trips_excluding(array $exclude, int $limit): array
                    u.name AS author_name
             FROM trips t
             JOIN users u ON u.id = t.author_id
-            WHERE t.is_published = 1';
+            WHERE t.is_published = true';
 
     $params = [];
 
@@ -115,7 +115,7 @@ function suggest_popular_spots(string $area, int $count = 5): array
                 GROUP_CONCAT(DISTINCT t.title ORDER BY t.title ASC SEPARATOR '、') AS featured_in_trips
          FROM trip_spots ts
          JOIN trips t ON t.id = ts.trip_id
-         WHERE t.is_published = 1
+         WHERE t.is_published = true
            AND (ts.address LIKE ? OR ts.name LIKE ?)
          GROUP BY ts.name, ts.latitude, ts.longitude, ts.address
          ORDER BY occurrence_count DESC, ts.name ASC

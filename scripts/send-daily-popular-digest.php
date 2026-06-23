@@ -87,7 +87,7 @@ $recipients = pdo()->query(
     "SELECT u.id, u.email, u.name, u.role
      FROM users u
      JOIN notification_preferences np ON np.user_id = u.id
-     WHERE u.role IN ('traveler', 'planner') AND np.popular_digest_enabled = 1
+     WHERE u.role IN ('traveler', 'planner') AND np.popular_digest_enabled = true
      ORDER BY u.id"
 )->fetchAll();
 

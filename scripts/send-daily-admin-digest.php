@@ -18,11 +18,11 @@ $summary = pdo()->query(
          WHERE logged_in_at >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND logged_in_at < CURDATE()) AS active_users,
         (SELECT COUNT(*)
          FROM login_events
-         WHERE is_new_device = 1
+         WHERE is_new_device = true
            AND logged_in_at >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND logged_in_at < CURDATE()) AS new_devices,
-        (SELECT COUNT(*)
-         FROM trip_participations
-         WHERE joined_at >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND joined_at < CURDATE()) AS participations,
+         (SELECT COUNT(*)
+          FROM trip_participations
+          WHERE joined_at >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND joined_at < CURDATE()) AS participations,
         (SELECT COUNT(*)
          FROM reviews
          WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND created_at < CURDATE()) AS reviews,

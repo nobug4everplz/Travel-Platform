@@ -42,7 +42,7 @@ $favoritePlanners = pdo()->prepare(
             COUNT(t.id) AS published_trip_count
      FROM favorite_planners fp
      JOIN users u ON u.id = fp.planner_id
-     LEFT JOIN trips t ON t.author_id = u.id AND t.is_published = 1
+     LEFT JOIN trips t ON t.author_id = u.id AND t.is_published = true
      WHERE fp.traveler_id = ?
      GROUP BY fp.created_at, u.id, u.email, u.name, u.avatar_url
      ORDER BY fp.created_at DESC'

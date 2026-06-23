@@ -7,7 +7,7 @@ require_once __DIR__ . '/../config/database.php';
 function get_public_trips(?string $query = null, int $limit = 12): array
 {
     $params = [];
-    $where = 't.is_published = 1';
+    $where = 't.is_published = true';
 
     if ($query !== null && trim($query) !== '') {
         $like = '%' . trim($query) . '%';
@@ -36,7 +36,7 @@ function get_public_planners(?string $query = null, int $limit = 8): array
         $like = '%' . trim($query) . '%';
         $where .= ' AND (u.name LIKE ? OR EXISTS (
             SELECT 1 FROM trips st
-            WHERE st.author_id = u.id AND st.is_published = 1 AND (st.title LIKE ? OR st.summary LIKE ?)
+            WHERE st.author_id = u.id AND st.is_published = true AND (st.title LIKE ? OR st.summary LIKE ?)
         ))';
         $params = [$like, $like, $like];
     }
@@ -44,11 +44,11 @@ function get_public_planners(?string $query = null, int $limit = 8): array
     $sql = "SELECT u.id, u.email, u.name, u.avatar_url, u.created_at,
                    COUNT(t.id) AS published_trip_count
             FROM users u
-            LEFT JOIN trips t ON t.author_id = u.id AND t.is_published = 1
-            WHERE {$where}
-            GROUP BY u.id, u.email, u.name, u.avatar_url, u.created_at
-            ORDER BY u.created_at DESC
-            LIMIT {$limit}";
+            LEFT JOIN trips t ON t.author_id = u.id AND t.is_published = true
+             WHERE {$where}
+             GROUP BY u.id, u.email, u.name, u.avatar_url, u.created_at
+             ORDER BY u.created_at DESC
+             LIMIT {$limit}";
     $stmt = pdo()->prepare($sql);
     $stmt->execute($params);
     return $stmt->fetchAll();
@@ -93,7 +93,7 @@ function get_planner(int $plannerId): ?array
         "SELECT u.id, u.email, u.name, u.avatar_url, u.created_at,
                 COUNT(t.id) AS published_trip_count
          FROM users u
-         LEFT JOIN trips t ON t.author_id = u.id AND t.is_published = 1
+         LEFT JOIN trips t ON t.author_id = u.id AND t.is_published = true
          WHERE u.id = ? AND u.role = 'planner'
          GROUP BY u.id, u.email, u.name, u.avatar_url, u.created_at
          LIMIT 1"
@@ -107,7 +107,7 @@ function get_planner_public_trips(int $plannerId): array
 {
     $stmt = pdo()->prepare(
         'SELECT * FROM trips
-         WHERE author_id = ? AND is_published = 1
+         WHERE author_id = ? AND is_published = true
          ORDER BY updated_at DESC'
     );
     $stmt->execute([$plannerId]);
