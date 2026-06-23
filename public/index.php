@@ -9,6 +9,9 @@ $pageTitle = '探索行程';
 $query = trim((string) ($_GET['q'] ?? ''));
 $trips = get_public_trips($query);
 $planners = get_public_planners($query);
+$pageType = 'home';
+$mapTrips = array_filter($trips, fn($t) => !empty($t['latitude']) && !empty($t['longitude']));
+$loadMap = !empty($mapTrips);
 
 require __DIR__ . '/../partials/header.php';
 ?>
@@ -25,6 +28,40 @@ require __DIR__ . '/../partials/header.php';
         <button class="primary" type="submit">搜尋</button>
     </form>
 </section>
+
+<?php if (!empty($mapTrips)): ?>
+<section class="panel">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Map</p>
+            <h2>行程地圖</h2>
+            <p class="muted">點擊標記查看行程詳情。</p>
+        </div>
+    </div>
+    <div id="trip-map" style="height: 400px; border-radius: 12px;"></div>
+</section>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var map = initMap('trip-map');
+    var markers = [];
+    var trips = <?= json_encode(array_map(fn($t) => [
+        'id' => (int)$t['id'],
+        'title' => $t['title'],
+        'latitude' => $t['latitude'],
+        'longitude' => $t['longitude'],
+        'average_rating' => $t['average_rating'],
+        'summary' => $t['summary'],
+    ], array_values($mapTrips)), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    trips.forEach(function(trip) {
+        var m = addTripMarker(map, trip);
+        if (m) markers.push(m);
+    });
+    if (markers.length > 1) fitAllMarkers(map, markers);
+});
+</script>
+<?php else: ?>
+<div class="empty-state">尚無含有地點資訊的行程。</div>
+<?php endif; ?>
 
 <section class="panel">
     <div class="section-heading">

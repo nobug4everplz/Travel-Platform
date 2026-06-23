@@ -61,6 +61,20 @@ $myReviews->execute([$user['id']]);
 $myReviewRows = $myReviews->fetchAll();
 
 $pageTitle = '旅人工作台';
+$pageType = 'traveler_dashboard';
+
+// Footprint map: participated trips with coordinates
+$footprintTrips = pdo()->prepare(
+    'SELECT DISTINCT t.id, t.title, t.latitude, t.longitude, t.average_rating, t.summary
+     FROM trip_participations tp
+     JOIN trips t ON t.id = tp.trip_id
+     WHERE tp.user_id = ? AND t.latitude IS NOT NULL AND t.longitude IS NOT NULL
+     ORDER BY tp.joined_at DESC'
+);
+$footprintTrips->execute([$user['id']]);
+$footprintTripRows = $footprintTrips->fetchAll();
+$loadMap = !empty($footprintTripRows);
+
 require __DIR__ . '/../partials/header.php';
 ?>
 <section class="page-heading">
@@ -90,6 +104,33 @@ require __DIR__ . '/../partials/header.php';
         </div>
     </div>
 </section>
+
+<?php if (!empty($footprintTripRows)): ?>
+<section class="panel">
+    <div class="section-heading"><div><p class="eyebrow">Footprints</p><h2>我的足跡</h2></div></div>
+    <div id="footprint-map" style="height: 400px; border-radius: 12px;"></div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var map = initMap('footprint-map');
+        var markers = [];
+        var trips = <?= json_encode(array_map(fn($t) => [
+            'id' => (int)$t['id'],
+            'title' => $t['title'],
+            'latitude' => $t['latitude'],
+            'longitude' => $t['longitude'],
+            'average_rating' => $t['average_rating'],
+            'summary' => $t['summary'],
+        ], $footprintTripRows), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        trips.forEach(function(trip) {
+            var m = addTripMarker(map, trip);
+            if (m) markers.push(m);
+        });
+        if (markers.length > 1) fitAllMarkers(map, markers);
+    });
+    </script>
+</section>
+<?php endif; ?>
+
 <section class="panel">
     <div class="section-heading"><div><p class="eyebrow">Joined</p><h2>已參加行程</h2></div></div>
     <?php if (!$participationRows): ?>

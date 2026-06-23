@@ -5,6 +5,11 @@ require_once __DIR__ . '/../lib/auth.php';
 $currentUser = current_user();
 $pageTitle = $pageTitle ?? 'Travel Platform';
 $flashes = consume_flashes();
+$pageType = $pageType ?? '';
+$bodyDataAttrs = $bodyDataAttrs ?? '';
+if ($pageType !== '') {
+    $bodyDataAttrs = 'data-page-type="' . e($pageType) . '" ' . $bodyDataAttrs;
+}
 ?>
 <!doctype html>
 <html lang="zh-Hant">
@@ -13,8 +18,13 @@ $flashes = consume_flashes();
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($pageTitle) ?> | Travel Platform</title>
     <link rel="stylesheet" href="/assets/app.css">
+    <?php if (!empty($loadMap)): ?>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9/dist/leaflet.js" defer></script>
+    <script src="/assets/map-utils.js" defer></script>
+    <?php endif; ?>
 </head>
-<body>
+<body <?= $bodyDataAttrs ?>>
 <header class="site-header">
     <a class="brand" href="/index.php" aria-label="Travel Platform 首頁">
         <span class="brand-mark">TP</span>
