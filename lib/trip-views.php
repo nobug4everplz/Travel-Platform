@@ -14,13 +14,31 @@ function record_trip_unique_view(array $trip, ?array $viewer): void
         return;
     }
 
+    // Guard: silently skip if the views table hasn't been created yet (e.g. mid-migration)
+    static $tableExists = null;
+    if ($tableExists === null) {
+        try {
+            $result = pdo()->query("SELECT 1 FROM information_schema.tables WHERE table_name='trip_daily_unique_views' AND table_type='BASE TABLE'");
+            $tableExists = (bool) $result->fetchColumn();
+        } catch (PDOException) {
+            $tableExists = false;
+        }
+    }
+    if (!$tableExists) {
+        return;
+    }
+
     $viewerKeyHash = trip_viewer_key_hash($viewer);
-    $stmt = pdo()->prepare(
-        'INSERT INTO trip_daily_unique_views (trip_id, view_date, viewer_key_hash)
-         VALUES (?, ?, ?)
-         ON CONFLICT (trip_id, view_date, viewer_key_hash) DO NOTHING'
-    );
-    $stmt->execute([(int) $trip['id'], date('Y-m-d'), $viewerKeyHash]);
+    try {
+        $stmt = pdo()->prepare(
+            'INSERT INTO trip_daily_unique_views (trip_id, view_date, viewer_key_hash)
+             VALUES (?, ?, ?)
+             ON CONFLICT (trip_id, view_date, viewer_key_hash) DO NOTHING'
+        );
+        $stmt->execute([(int) $trip['id'], date('Y-m-d'), $viewerKeyHash]);
+    } catch (PDOException) {
+        // Silent fail — table may have been dropped mid-request
+    }
 }
 
 function trip_viewer_key_hash(?array $viewer): string
