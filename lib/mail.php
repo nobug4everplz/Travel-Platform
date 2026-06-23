@@ -29,7 +29,7 @@ function log_email_delivery(string $type, array $recipient, string $subject, str
 {
     $stmt = pdo()->prepare(
         'INSERT INTO email_delivery_logs
-            (mail_type, recipient_email, user_id, reference_key, subject, status, error_message, sent_at)
+            (mail_type, recipient_email, user_id, reference_key, subject, status, error_message, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([
