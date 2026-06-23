@@ -418,10 +418,26 @@ function generate_trip_pdf(array $trip, array $spots, ?array $weatherNow = null,
         $pdf->writeLine('日期：' . $dateStr, lineHeight: 7);
     }
 
-    // Cover image
+    // Cover image — download if URL
     if (!empty($trip['cover_image'])) {
         $coverPath = $trip['cover_image'];
-        $pdf->image($coverPath, PDF_MARGIN_L, $pdf->getCursorY(), $pdf->getContentW(), 60);
+        $tmpFile = null;
+        if (filter_var($coverPath, FILTER_VALIDATE_URL)) {
+            $imgData = @file_get_contents($coverPath, false, stream_context_create([
+                'http' => ['timeout' => 10, 'ignore_errors' => true],
+            ]));
+            if ($imgData !== false) {
+                $tmpFile = tempnam(sys_get_temp_dir(), 'cover_');
+                file_put_contents($tmpFile, $imgData);
+                $coverPath = $tmpFile;
+            }
+        }
+        if ($tmpFile !== null || is_file($coverPath)) {
+            $pdf->image($coverPath, PDF_MARGIN_L, $pdf->getCursorY(), $pdf->getContentW(), 60);
+        }
+        if ($tmpFile !== null) {
+            @unlink($tmpFile);
+        }
         $pdf->writeLine('', lineHeight: 65);
         $pdf->addPage(); // move map to its own page for cleaner layout
     }
