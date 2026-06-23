@@ -134,6 +134,37 @@ function format_date(?string $value): string
     return date('Y/m/d', strtotime($value));
 }
 
+/**
+ * Render summary text supporting Markdown image syntax `![alt](url)`.
+ *
+ * HTML-escapes everything first (XSS protection), then converts
+ * safe `![alt](https://...)` patterns to <img> tags.
+ * Only http/https URLs are accepted; non-http URLs are left as text.
+ */
+function render_markdown_images(?string $text): string
+{
+    if ($text === null || $text === '') {
+        return '';
+    }
+
+    $safe = htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+    $result = preg_replace_callback(
+        '/!\\[(.*?)\\]\\((.*?)\\)/',
+        function (array $m): string {
+            $alt = $m[1];
+            $url = $m[2];
+            if (preg_match('#^https?://#i', $url)) {
+                return '<img src="' . $url . '" alt="' . $alt . '" style="max-width:100%;border-radius:8px;">';
+            }
+            return $m[0];
+        },
+        $safe
+    );
+
+    return $result;
+}
+
 function display_initial(?string $value): string
 {
     $text = trim($value ?? '');

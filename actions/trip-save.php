@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/trips.php';
 require_once __DIR__ . '/../lib/spot-actions.php';
+require_once __DIR__ . '/../lib/trip-gear.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     redirect('/planner-dashboard.php');
@@ -50,6 +51,10 @@ if ($tripId !== null) {
     $stmt = pdo()->prepare('UPDATE trips SET title = ?, summary = ?, cover_image = ?, latitude = ?, longitude = ?, address = ?, place_id = ?, is_published = ? WHERE id = ? AND author_id = ?');
     $stmt->execute([$title, $summary, $coverImage, $latitude, $longitude, $address, $placeId, $isPublished, $tripId, $user['id']]);
     save_trip_spots($tripId, $_POST['spots'] ?? []);
+
+    /* ── 儲存建議裝備 ── */
+    save_trip_gear($tripId, (array) ($_POST['gear'] ?? []));
+
     flash('success', $isPublished ? '行程已發布。' : '草稿已儲存。');
     redirect('/editor.php?id=' . $tripId);
 }

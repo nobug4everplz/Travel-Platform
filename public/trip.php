@@ -32,7 +32,11 @@ $isFavorited = $user && in_array($user['role'], ['traveler', 'planner'], true)
 $myReview = $isTraveler ? get_user_review_for_trip((int) $user['id'], $tripId) : null;
 
 require_once __DIR__ . '/../lib/spot-actions.php';
+require_once __DIR__ . '/../lib/trip-gear.php';
+require_once __DIR__ . '/../lib/weather.php';
 $spots = get_trip_spots($tripId);
+$gear = get_trip_gear($tripId);
+$hasGear = count($gear) > 0;
 $hasMap = $trip['latitude'] && $trip['longitude'];
 if ($hasMap) {
     $loadMap = true;
@@ -55,7 +59,7 @@ require __DIR__ . '/../partials/header.php';
         <div>
             <p class="eyebrow"><?= $isPublished ? 'Published Trip' : 'Draft Preview' ?></p>
             <h1><?= e($trip['title']) ?></h1>
-            <p class="muted"><?= e($trip['summary'] ?: '這個行程尚未填寫摘要。') ?></p>
+            <p class="muted"><?= render_markdown_images($trip['summary'] ?: '這個行程尚未填寫摘要。') ?></p>
             <p class="meta">評分 <?= e(format_rating($trip['average_rating'])) ?>，<?= (int) $trip['review_count'] ?> 則評論</p>
             <p class="meta">規劃師 <a class="text-link" href="/planner.php?id=<?= (int) $trip['author_id'] ?>"><?= e($trip['author_name'] ?: $trip['author_email']) ?></a></p>
             <div class="actions">
@@ -157,6 +161,67 @@ require __DIR__ . '/../partials/header.php';
     <?php endif; ?>
     </div>
 </section>
+<?php if ($hasGear): ?>
+<section class="panel">
+    <div class="section-heading">
+        <div><p class="eyebrow">Gear</p><h2>建議裝備</h2></div>
+        <button class="button small" onclick="var c=this.parentElement.parentElement.querySelector('.collapse-wrap');c.style.display=c.style.display==='none'?'':'none';this.textContent=c.style.display==='none'?'展開':'收合'" type="button">收合</button>
+    </div>
+    <div class="collapse-wrap">
+        <div class="grid">
+            <?php foreach ($gear as $g): ?>
+            <article class="card"><div class="card-body" style="text-align:center;">
+                <span style="font-size:2.5rem;display:block;margin-bottom:0.5rem;"><?= e($g['icon']) ?></span>
+                <h3><?= e($g['name']) ?></h3>
+                <?php if ($g['affiliate_url']): ?>
+                <div class="actions" style="justify-content:center;">
+                    <a class="button small primary" href="<?= e($g['affiliate_url']) ?>" target="_blank" rel="noopener">🛒 購買</a>
+                </div>
+                <?php endif; ?>
+            </div></article>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</section>
+<?php endif; ?>
+
+<?php
+$hasWeather = false;
+$weatherNow = null;
+$weatherForecast = null;
+if (!empty($trip['address'])) {
+    $city = extract_city_from_address($trip['address']);
+    if ($city !== '') {
+        $weatherNow = get_weather($city);
+        $weatherForecast = get_forecast($city);
+        $hasWeather = $weatherNow !== null;
+    }
+}
+?>
+<?php if ($hasWeather): ?>
+<section class="panel">
+    <div class="section-heading"><div><p class="eyebrow">Weather</p><h2>當地天氣</h2></div></div>
+    <div class="weather-current" style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;">
+        <img src="https://openweathermap.org/img/wn/<?= e($weatherNow['icon']) ?>@2x.png" alt="<?= e($weatherNow['description']) ?>" style="width:60px;height:60px;">
+        <div>
+            <span style="font-size:2rem;font-weight:700;"><?= round($weatherNow['temp']) ?>°C</span>
+            <span style="color:#666;"><?= e($weatherNow['description']) ?></span>
+        </div>
+    </div>
+    <?php if ($weatherForecast): ?>
+    <div class="grid three">
+        <?php foreach ($weatherForecast as $day): ?>
+        <div class="card"><div class="card-body" style="text-align:center;">
+            <p class="muted" style="margin-bottom:0.25rem;"><?= e(date('m/d', strtotime($day['date']))) ?></p>
+            <img src="https://openweathermap.org/img/wn/<?= e($day['icon']) ?>.png" alt="<?= e($day['description']) ?>" style="width:50px;height:50px;">
+            <p style="margin:0;"><strong><?= round($day['temp_high']) ?>°</strong> / <?= round($day['temp_low']) ?>°</p>
+            <p class="muted" style="font-size:13px;"><?= e($day['description']) ?></p>
+        </div></div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+</section>
+<?php endif; ?>
 <section class="panel">
     <div class="section-heading"><div><p class="eyebrow">Reviews</p><h2>行程評論</h2></div></div>
     <?php if ($isTraveler && $isParticipating): ?>

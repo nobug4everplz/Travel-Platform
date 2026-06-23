@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/trips.php';
+require_once __DIR__ . '/../lib/spot-actions.php';
+require_once __DIR__ . '/../lib/trip-gear.php';
 
 $user = require_role('planner');
 $tripId = input_int($_GET, 'id');
@@ -31,8 +33,9 @@ if ($_GET['ai_fill'] ?? null) {
     }
 }
 
-require_once __DIR__ . '/../lib/spot-actions.php';
 $spots = $tripId ? get_trip_spots($tripId) : [];
+$editorGear = $tripId ? get_trip_gear($tripId) : [];
+$hasEditorGear = count($editorGear) > 0;
 $pageTitle = $trip ? '編輯行程' : '新增行程';
 $pageType = 'editor';
 if ($trip) {
@@ -65,6 +68,7 @@ require __DIR__ . '/../partials/header.php';
         </label>
         <label>行程摘要
             <textarea name="summary" placeholder="描述行程亮點、適合對象與體驗內容"><?= e($trip['summary'] ?? '') ?></textarea>
+            <p class="muted" style="font-size:13px;margin-top:4px;">支援 Markdown 圖片語法：<code>![圖片說明](圖片網址)</code></p>
         </label>
 
         <fieldset>
@@ -82,6 +86,43 @@ require __DIR__ . '/../partials/header.php';
             <button type="submit" name="intent" value="draft">儲存草稿</button>
             <button class="primary" type="submit" name="intent" value="publish">發布行程</button>
         </div>
+
+    <?php if ($trip && $hasEditorGear): ?>
+    <section class="panel" style="margin-top:1.5rem;">
+        <h2>建議裝備</h2>
+
+        <div id="gear-list" style="margin-bottom:16px;">
+            <?php foreach ($editorGear as $gi => $gear): ?>
+            <div class="card gear-item" style="margin-bottom:8px;">
+                <span class="gear-handle">⠿</span>
+                <div class="card-body" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <select name="gear[<?= $gi ?>][icon]" style="width:64px;font-size:20px;text-align:center;">
+                        <?php foreach (['🎒','🥾','🧥','🧴','🧢','🕶️','🔦','🧭','💧','🥪','📷','🪥','🧤','🧣','🌂','⛺'] as $emoji): ?>
+                        <option value="<?= $emoji ?>" <?= $gear['icon'] === $emoji ? 'selected' : '' ?>><?= $emoji ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <input type="text" name="gear[<?= $gi ?>][name]" value="<?= e($gear['name']) ?>" placeholder="裝備名稱" maxlength="255" style="flex:1;min-width:120px;">
+                    <input type="url" name="gear[<?= $gi ?>][affiliate_url]" value="<?= e($gear['affiliate_url'] ?? '') ?>" placeholder="購買連結 https://..." style="flex:2;min-width:180px;">
+                    <button class="danger small" type="button" onclick="this.closest('.gear-item').remove()">刪除</button>
+                </div>
+            </div>
+            <?php endforeach; ?>
+            <?php if (!$hasEditorGear): ?>
+            <p class="muted" id="gear-empty">尚未新增建議裝備。</p>
+            <?php endif; ?>
+        </div>
+
+        <button class="small" type="button" onclick="addGearRow()">＋ 新增裝備</button>
+    </section>
+    <?php elseif ($trip): ?>
+    <section class="panel" style="margin-top:1.5rem;">
+        <h2>建議裝備</h2>
+        <div id="gear-list" style="margin-bottom:16px;">
+            <p class="muted" id="gear-empty">尚未新增建議裝備。</p>
+        </div>
+        <button class="small" type="button" onclick="addGearRow()">＋ 新增裝備</button>
+    </section>
+    <?php endif; ?>
     </form>
 </section>
 
@@ -133,6 +174,32 @@ require __DIR__ . '/../partials/header.php';
     <div id="spot-picker-map" style="height:0;border-radius:8px;margin-top:0.5rem;transition:height 0.3s;overflow:hidden;"></div>
     <p class="muted" style="margin-top:0.75rem"><small>點擊「新增景點」後填寫資訊，或點「📍 地圖定位」在地圖上點選位置。拖曳 ⠿ 可調整排序。</small></p>
 </section>
+
+<!-- gear section moved inside <form> above -->
+
+<script>
+function addGearRow() {
+    var empty = document.getElementById('gear-empty');
+    if (empty) empty.remove();
+    var gearIndex = document.getElementById('gear-list').querySelectorAll('.gear-item').length;
+    var div = document.createElement('div');
+    div.className = 'card gear-item';
+    div.style.marginBottom = '8px';
+    div.innerHTML =
+        '<span class="gear-handle">⠿</span>' +
+        '<div class="card-body" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+        '  <select name="gear[' + gearIndex + '][icon]" style="width:64px;font-size:20px;text-align:center;">' +
+        '    <?php foreach (['🎒','🥾','🧥','🧴','🧢','🕶️','🔦','🧭','💧','🥪','📷','🪥','🧤','🧣','🌂','⛺'] as $emoji): ?>' +
+        '    <option value="<?= $emoji ?>"><?= $emoji ?></option>' +
+        '    <?php endforeach; ?>' +
+        '  </select>' +
+        '  <input type="text" name="gear[' + gearIndex + '][name]" placeholder="裝備名稱" maxlength="255" style="flex:1;min-width:120px;" required>' +
+        '  <input type="url" name="gear[' + gearIndex + '][affiliate_url]" placeholder="購買連結 https://..." style="flex:2;min-width:180px;">' +
+        '  <button class="danger small" type="button" onclick="this.closest(\'.gear-item\').remove()">刪除</button>' +
+        '</div>';
+    document.getElementById('gear-list').appendChild(div);
+}
+</script>
 <?php endif; ?>
 
 <script>
@@ -188,12 +255,19 @@ function openSpotPicker(btn) {
     }
 }
 
-// SortableJS drag reorder for spots
+// SortableJS drag reorder for spots + gear
 document.addEventListener('DOMContentLoaded', function() {
     var el = document.getElementById('spots-container');
     if (el && typeof Sortable !== 'undefined') {
         Sortable.create(el, {
             handle: '.spot-handle',
+            animation: 150,
+        });
+    }
+    var gearList = document.getElementById('gear-list');
+    if (gearList && typeof Sortable !== 'undefined') {
+        Sortable.create(gearList, {
+            handle: '.gear-handle',
             animation: 150,
         });
     }
