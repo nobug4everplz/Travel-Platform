@@ -104,6 +104,23 @@ function addSpotMarker(map, spot, index) {
   if (spot.address) {
     html += '<br><span>' + escapeHtml(spot.address) + '</span>';
   }
+  // Show first photo thumbnail if spot has photos
+  if (spot._photos && spot._photos.length > 0) {
+    var first = spot._photos[0];
+    html += '<br><a href="#" onclick="return false;" style="display:inline-block;margin-top:6px;border-radius:6px;overflow:hidden;border:1px solid #ddd;">' +
+      '<img src="' + escapeHtml(first.image_path) + '" alt="photo" ' +
+      'data-uploader="' + escapeHtml(first.uploader_name ?? '') + '" ' +
+      'data-caption="' + escapeHtml(first.caption ?? '') + '" ' +
+      'style="width:120px;height:90px;object-fit:cover;display:block;cursor:pointer;" ' +
+      'onclick="var lb=document.getElementById(\'lightbox\'),im=document.getElementById(\'lightbox-image\'),nf=document.getElementById(\'lightbox-info\');' +
+      'if(lb&&im){im.src=this.src;' +
+      'if(nf){var p=[],u=this.getAttribute(\'data-uploader\'),c=this.getAttribute(\'data-caption\');' +
+      'if(u)p.push(\'📸 \'+u);if(c)p.push(\'\\"\'+c+\'\\"\');nf.textContent=p.join(\' · \');}' +
+      'lb.style.display=\'flex\';document.body.style.overflow=\'hidden\';}return false;"></a>' +
+    if (first.caption) {
+      html += '<br><span style="font-size:12px;color:#666;">' + escapeHtml(first.caption) + '</span>';
+    }
+  }
   if (spot.notes) {
     html += '<br><p>' + escapeHtml(spot.notes) + '</p>';
   }

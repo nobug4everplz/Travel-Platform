@@ -35,6 +35,10 @@ require_once __DIR__ . '/../lib/spot-actions.php';
 require_once __DIR__ . '/../lib/trip-gear.php';
 require_once __DIR__ . '/../lib/weather.php';
 require_once __DIR__ . '/../lib/currency.php';
+require_once __DIR__ . '/../lib/trip-photos.php';
+require_once __DIR__ . '/../lib/traveler-match.php';
+$participants = get_trip_participants($tripId);
+$participantCount = count($participants);
 $spots = get_trip_spots($tripId);
 $gear = get_trip_gear($tripId);
 $hasGear = count($gear) > 0;
@@ -42,6 +46,8 @@ $hasMap = $trip['latitude'] && $trip['longitude'];
 if ($hasMap) {
     $loadMap = true;
 }
+$photos = get_trip_photos($tripId);
+$spotPhotos = get_spot_photos_grouped($tripId);
 
 $pageTitle = $trip['title'];
 $pageType = 'trip';
@@ -154,8 +160,12 @@ if ($showBudget):
 
         // 景點 markers
         var spots = <?= json_encode($spots, JSON_UNESCAPED_UNICODE) ?>;
+        var spotPhotos = <?= json_encode($spotPhotos, JSON_UNESCAPED_UNICODE) ?>;
         var spotMarkers = [];
         for (var i = 0; i < spots.length; i++) {
+            if (spotPhotos[spots[i].id]) {
+                spots[i]._photos = spotPhotos[spots[i].id];
+            }
             var sm = addSpotMarker(map, spots[i], i);
             if (sm) spotMarkers.push(sm);
         }
@@ -218,6 +228,31 @@ if ($showBudget):
 </section>
 <?php endif; ?>
 
+<?php if ($participantCount > 0): ?>
+<section class="panel">
+    <div class="section-heading"><div><p class="eyebrow">Travelers</p><h2>參加者 (<?= $participantCount ?>)</h2></div></div>
+    <?php if ($user): ?>
+        <div class="grid three">
+            <?php foreach ($participants as $p): ?>
+                <a class="card card-link" href="/traveler-profile.php?id=<?= (int) $p['id'] ?>"><div class="card-body" style="display:flex;align-items:center;gap:0.75rem;">
+                    <?php if ($p['avatar_url']): ?>
+                        <img class="avatar" src="<?= e($p['avatar_url']) ?>" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;">
+                    <?php else: ?>
+                        <span class="avatar-placeholder" style="width:48px;height:48px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-weight:700;color:#6b7280;"><?= e(display_initial($p['name'])) ?></span>
+                    <?php endif; ?>
+                    <div>
+                        <strong><?= e($p['name'] ?: '匿名旅人') ?></strong>
+                        <p class="muted" style="font-size:13px;">參加於 <?= e(format_date($p['joined_at'])) ?></p>
+                    </div>
+                </div></a>
+            <?php endforeach; ?>
+        </div>
+    <?php else: ?>
+        <p class="muted">登入後即可查看參加者詳細資訊。</p>
+    <?php endif; ?>
+</section>
+<?php endif; ?>
+
 <?php
 $hasWeather = false;
 $weatherNow = null;
@@ -255,6 +290,96 @@ if (!empty($trip['address'])) {
     <?php endif; ?>
 </section>
 <?php endif; ?>
+<?php if (count($photos) > 0 || ($isTraveler && $isParticipating)): ?>
+<section class="panel">
+    <div class="section-heading">
+        <div><p class="eyebrow">Photos</p><h2>照片牆</h2></div>
+    </div>
+
+    <?php if ($isTraveler && $isParticipating): ?>
+    <form method="post" action="/actions/upload-photo.php" enctype="multipart/form-data" class="form-grid" style="margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border);">
+        <?= csrf_field() ?>
+        <input type="hidden" name="trip_id" value="<?= (int) $trip['id'] ?>">
+        <label>選擇照片
+            <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required>
+        </label>
+        <label>關聯景點（選填）
+            <select name="spot_id">
+                <option value="">不指定</option>
+                <?php foreach ($spots as $spot): ?>
+                <option value="<?= (int) $spot['id'] ?>"><?= e($spot['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <label>照片說明（選填）
+            <input type="text" name="caption" placeholder="簡短描述這張照片..." maxlength="500">
+        </label>
+        <div class="actions">
+            <button class="primary" type="submit">📷 上傳照片</button>
+        </div>
+    </form>
+    <?php endif; ?>
+
+    <?php if (count($photos) > 0): ?>
+    <div class="photo-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+        <?php foreach ($photos as $photo): ?>
+        <article class="card" style="overflow:hidden;">
+            <a href="#" class="photo-thumb" data-src="<?= e($photo['image_path']) ?>" data-caption="<?= e($photo['caption'] ?? '') ?>" data-uploader="<?= e($photo['uploader_name'] ?: '匿名旅行者') ?>" data-spot="<?= e($photo['spot_name'] ?? '') ?>" data-date="<?= e(format_date($photo['created_at'])) ?>" onclick="openLightbox(this);return false;" style="display:block;aspect-ratio:4/3;background:var(--surface-muted);overflow:hidden;">
+                <img src="<?= e($photo['image_path']) ?>" alt="<?= e($photo['caption'] ?? '照片') ?>" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+            </a>
+            <div class="card-body" style="padding:10px 12px;font-size:13px;">
+                <p style="margin:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📸 <?= e($photo['uploader_name'] ?: '匿名旅行者') ?></p>
+                <?php if ($photo['spot_name']): ?>
+                <p style="margin:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📍 <?= e($photo['spot_name']) ?></p>
+                <?php endif; ?>
+                <?php if ($photo['caption']): ?>
+                <p style="margin:0;color:var(--muted-strong);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">“<?= e($photo['caption']) ?>”</p>
+                <?php endif; ?>
+            </div>
+        </article>
+        <?php endforeach; ?>
+    </div>
+    <?php else: ?>
+    <div class="empty-state">尚無照片，快上傳第一張吧！</div>
+    <?php endif; ?>
+</section>
+<?php endif; ?>
+<!-- Lightbox overlay -->
+<div id="lightbox" onclick="closeLightbox(event)" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,0.85);justify-content:center;align-items:center;flex-direction:column;padding:2rem;">
+    <button onclick="closeLightbox()" style="position:absolute;top:1rem;right:1.5rem;background:none;border:none;color:#fff;font-size:2rem;cursor:pointer;z-index:10;" type="button" aria-label="關閉">✕</button>
+    <img id="lightbox-image" src="" alt="" style="max-width:90vw;max-height:75vh;border-radius:8px;object-fit:contain;">
+    <div id="lightbox-info" style="color:#ccc;text-align:center;margin-top:1rem;font-size:14px;max-width:600px;"></div>
+</div>
+<script>
+function openLightbox(el) {
+    var lb = document.getElementById('lightbox');
+    var img = document.getElementById('lightbox-image');
+    var info = document.getElementById('lightbox-info');
+    img.src = el.getAttribute('data-src');
+    var parts = [];
+    var uploader = el.getAttribute('data-uploader');
+    if (uploader) parts.push('📸 ' + uploader);
+    var spot = el.getAttribute('data-spot');
+    if (spot) parts.push('📍 ' + spot);
+    var caption = el.getAttribute('data-caption');
+    if (caption) parts.push('“' + caption + '”');
+    info.textContent = parts.join(' · ');
+    lb.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+function closeLightbox(e) {
+    if (e && e.target !== e.currentTarget) return;
+    var lb = document.getElementById('lightbox');
+    lb.style.display = 'none';
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        var lb = document.getElementById('lightbox');
+        if (lb.style.display !== 'none') closeLightbox();
+    }
+});
+</script>
 <section class="panel">
     <div class="section-heading"><div><p class="eyebrow">Reviews</p><h2>行程評論</h2></div></div>
     <?php if ($isTraveler && $isParticipating): ?>
