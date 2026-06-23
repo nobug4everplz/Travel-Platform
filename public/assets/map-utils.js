@@ -116,7 +116,7 @@ function addSpotMarker(map, spot, index) {
       'if(lb&&im){im.src=this.src;' +
       'if(nf){var p=[],u=this.getAttribute(\'data-uploader\'),c=this.getAttribute(\'data-caption\');' +
       'if(u)p.push(\'📸 \'+u);if(c)p.push(\'\\"\'+c+\'\\"\');nf.textContent=p.join(\' · \');}' +
-      'lb.style.display=\'flex\';document.body.style.overflow=\'hidden\';}return false;"></a>' +
+      'lb.style.display=\'flex\';document.body.style.overflow=\'hidden\';}return false;"></a>';
     if (first.caption) {
       html += '<br><span style="font-size:12px;color:#666;">' + escapeHtml(first.caption) + '</span>';
     }

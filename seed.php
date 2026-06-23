@@ -7,11 +7,12 @@ require_once __DIR__ . '/lib/reviews.php';
 
 $db = pdo();
 
-$db->exec('SET FOREIGN_KEY_CHECKS = 0');
+$db->beginTransaction();
+$db->exec('SET CONSTRAINTS ALL DEFERRED');
 foreach (['email_delivery_logs', 'trip_daily_unique_views', 'notification_preferences', 'login_events', 'trusted_devices', 'reviews', 'favorite_planners', 'favorite_trips', 'trip_participations', 'trips', 'users'] as $table) {
     $db->exec("TRUNCATE TABLE {$table}");
 }
-$db->exec('SET FOREIGN_KEY_CHECKS = 1');
+$db->commit();
 
 $password = password_hash('password123', PASSWORD_DEFAULT);
 
