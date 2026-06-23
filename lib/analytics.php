@@ -53,7 +53,7 @@ function popular_public_trips(int $limit = 5): array
     $stmt = pdo()->prepare(
         'SELECT t.id, t.title, t.average_rating, t.review_count, COUNT(ft.id) AS favorite_count
          FROM trips t LEFT JOIN favorite_trips ft ON ft.trip_id = t.id
-         WHERE t.is_published = true
+         WHERE t.is_published = 1
          GROUP BY t.id, t.title, t.average_rating, t.review_count, t.updated_at
          ORDER BY favorite_count DESC, t.average_rating IS NULL ASC, t.average_rating DESC, t.review_count DESC, t.updated_at DESC
          LIMIT ?'
@@ -69,7 +69,7 @@ function popular_planners(int $limit = 3): array
         'SELECT u.id, u.email, u.name, COUNT(DISTINCT fp.id) AS follower_count,
                 AVG(t.average_rating) AS average_rating, COUNT(DISTINCT t.id) AS trip_count
          FROM users u
-         JOIN trips t ON t.author_id = u.id AND t.is_published = true
+         JOIN trips t ON t.author_id = u.id AND t.is_published = 1
          LEFT JOIN favorite_planners fp ON fp.planner_id = u.id
          WHERE u.role = ?
          GROUP BY u.id, u.email, u.name, u.created_at

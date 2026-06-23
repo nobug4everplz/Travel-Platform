@@ -41,25 +41,25 @@ foreach ($recipients as $recipient) {
     $statsStmt = pdo()->prepare(
         "SELECT
             (SELECT COUNT(*) FROM trip_daily_unique_views v JOIN trips t ON t.id = v.trip_id
-             WHERE t.author_id = ? AND t.is_published = true AND v.view_date BETWEEN ? AND ?) AS views,
+             WHERE t.author_id = ? AND t.is_published = 1 AND v.view_date BETWEEN ? AND ?) AS views,
             (SELECT COUNT(*) FROM favorite_trips f JOIN trips t ON t.id = f.trip_id
-             WHERE t.author_id = ? AND t.is_published = true AND DATE(f.created_at) BETWEEN ? AND ?) AS favorites,
+             WHERE t.author_id = ? AND t.is_published = 1 AND DATE(f.created_at) BETWEEN ? AND ?) AS favorites,
             (SELECT COUNT(*) FROM trip_participations p JOIN trips t ON t.id = p.trip_id
-             WHERE t.author_id = ? AND t.is_published = true AND DATE(p.joined_at) BETWEEN ? AND ?) AS participations,
+             WHERE t.author_id = ? AND t.is_published = 1 AND DATE(p.joined_at) BETWEEN ? AND ?) AS participations,
             (SELECT COUNT(*) FROM reviews r JOIN trips t ON t.id = r.trip_id
-             WHERE t.author_id = ? AND t.is_published = true AND DATE(r.created_at) BETWEEN ? AND ?) AS reviews"
+             WHERE t.author_id = ? AND t.is_published = 1 AND DATE(r.created_at) BETWEEN ? AND ?) AS reviews"
     );
     $statsStmt->execute([(int) $recipient['id'], $periodStart, $periodEnd, (int) $recipient['id'], $periodStart, $periodEnd, (int) $recipient['id'], $periodStart, $periodEnd, (int) $recipient['id'], $periodStart, $periodEnd]);
     $stats = $statsStmt->fetch();
     $topStmt = pdo()->prepare(
         'SELECT t.title, COUNT(v.id) AS view_count FROM trips t LEFT JOIN trip_daily_unique_views v ON v.trip_id = t.id AND v.view_date BETWEEN ? AND ?
-         WHERE t.author_id = ? AND t.is_published = true GROUP BY t.id, t.title ORDER BY view_count DESC, t.title ASC LIMIT 1'
+         WHERE t.author_id = ? AND t.is_published = 1 GROUP BY t.id, t.title ORDER BY view_count DESC, t.title ASC LIMIT 1'
     );
     $topStmt->execute([$periodStart, $periodEnd, (int) $recipient['id']]);
     $topTrip = $topStmt->fetch();
     $reviewStmt = pdo()->prepare(
         'SELECT t.title, r.comment FROM reviews r JOIN trips t ON t.id = r.trip_id
-         WHERE t.author_id = ? AND t.is_published = true AND DATE(r.created_at) BETWEEN ? AND ? ORDER BY r.created_at DESC LIMIT 2'
+         WHERE t.author_id = ? AND t.is_published = 1 AND DATE(r.created_at) BETWEEN ? AND ? ORDER BY r.created_at DESC LIMIT 2'
     );
     $reviewStmt->execute([(int) $recipient['id'], $periodStart, $periodEnd]);
     $reviews = $reviewStmt->fetchAll();

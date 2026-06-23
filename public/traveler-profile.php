@@ -23,7 +23,7 @@ if (!$traveler) {
 $tripCountStmt = pdo()->prepare(
     'SELECT COUNT(*) AS cnt
      FROM trip_participations p
-     JOIN trips t ON t.id = p.trip_id AND t.is_published = true
+     JOIN trips t ON t.id = p.trip_id AND t.is_published = 1
      WHERE p.user_id = ?'
 );
 $tripCountStmt->execute([$travelerId]);

@@ -267,7 +267,7 @@ function handle_search_trips(array $args, array $user): array
                 u.name AS author_name, u.avatar_url AS author_avatar
          FROM trips t
          JOIN users u ON u.id = t.author_id
-         WHERE t.is_published = true
+         WHERE t.is_published = 1
            AND (t.title LIKE ? OR t.summary LIKE ? OR u.name LIKE ?)
          ORDER BY t.average_rating DESC, t.review_count DESC, t.updated_at DESC
          LIMIT ?'
@@ -321,11 +321,11 @@ function handle_get_planner_stats(array $args, array $user): array
 
     $stmt = pdo()->prepare(
         'SELECT
-            (SELECT COUNT(*) FROM trips WHERE author_id = ? AND is_published = true) AS published_count,
+            (SELECT COUNT(*) FROM trips WHERE author_id = ? AND is_published = 1) AS published_count,
             (SELECT COUNT(*) FROM trips WHERE author_id = ? AND is_published = false) AS draft_count,
             (SELECT COUNT(*) FROM favorite_planners WHERE planner_id = ?) AS follower_count,
             (SELECT COUNT(*) FROM reviews r JOIN trips t ON t.id = r.trip_id WHERE t.author_id = ?) AS review_count,
-            (SELECT ROUND(AVG(t.average_rating), 1) FROM trips t WHERE t.author_id = ? AND t.is_published = true AND t.review_count > 0) AS avg_rating'
+            (SELECT ROUND(AVG(t.average_rating), 1) FROM trips t WHERE t.author_id = ? AND t.is_published = 1 AND t.review_count > 0) AS avg_rating'
     );
     $stmt->execute([$uid, $uid, $uid, $uid, $uid]);
     $stats = $stmt->fetch();

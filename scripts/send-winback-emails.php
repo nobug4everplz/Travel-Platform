@@ -42,7 +42,7 @@ foreach ($recipients as $recipient) {
             'SELECT COUNT(DISTINCT v.id) AS views, COUNT(DISTINCT r.id) AS reviews
              FROM trips t LEFT JOIN trip_daily_unique_views v ON v.trip_id = t.id
              LEFT JOIN reviews r ON r.trip_id = t.id
-             WHERE t.author_id = ? AND t.is_published = true'
+             WHERE t.author_id = ? AND t.is_published = 1'
         );
         $statsStmt->execute([(int) $recipient['id']]);
         $plannerStats = $statsStmt->fetch();
