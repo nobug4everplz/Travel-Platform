@@ -29,6 +29,40 @@ if (!hash_equals(csrf_token(), $csrfToken)) {
 
 $user = require_login();
 
+// ═══════════════════════════════════════
+// ABUSE PREVENTION LAYER
+// ═══════════════════════════════════════
+
+// 1. Message length cap
+$message = trim((string) ($input['message'] ?? ''));
+if (mb_strlen($message) > 2000) {
+    http_response_code(400);
+    echo json_encode(['reply' => null, 'error' => '訊息過長，請限制在 2000 字以內。']);
+    exit;
+}
+if ($message === '') {
+    http_response_code(400);
+    echo json_encode(['reply' => null, 'error' => '請輸入訊息']);
+    exit;
+}
+
+// 2. Block obvious prompt injection patterns
+$blockedPatterns = [
+    '/system:\s*ignore/i',
+    '/ignore\s+(all\s+)?(previous|above|instructions)/i',
+    '/you\s+are\s+now\s+(DAN|jailbroken)/i',
+    '/\[INST\].*\[\/INST\]/i',
+    '/<\|im_start\|>/i',
+];
+foreach ($blockedPatterns as $pattern) {
+    if (preg_match($pattern, $message)) {
+        http_response_code(400);
+        echo json_encode(['reply' => null, 'error' => '訊息包含不允許的內容。']);
+        exit;
+    }
+}
+
+// 3. Session rate limit (10/min) — existing, moved here
 $now = time();
 $window = $_SESSION['chat_rate_limit'] ?? [];
 $window = array_values(array_filter($window, fn(int $ts) => $now - $ts < 60));
@@ -40,16 +74,59 @@ if (count($window) >= 10) {
 $window[] = $now;
 $_SESSION['chat_rate_limit'] = $window;
 
-$message  = trim((string) ($input['message'] ?? ''));
+// 4. IP-based rate limit (30/min per IP)
+$ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+$ipKey = 'chat_ip_rate_' . md5($ip);
+$ipWindow = $_SESSION[$ipKey] ?? [];
+$ipWindow = array_values(array_filter($ipWindow, fn(int $ts) => $now - $ts < 60));
+if (count($ipWindow) >= 30) {
+    http_response_code(429);
+    echo json_encode(['reply' => null, 'error' => '請求過於頻繁，請稍後再試。']);
+    exit;
+}
+$ipWindow[] = $now;
+$_SESSION[$ipKey] = $ipWindow;
+
+// 5. Daily token budget per user (50,000 tokens/day ≈ ~150 messages)
+define('DAILY_TOKEN_BUDGET', 50000);
+$db = pdo();
+$today = date('Y-m-d');
+$usageStmt = $db->prepare(
+    'SELECT SUM(tokens_used) AS total FROM ai_usage_log WHERE user_id = ? AND usage_date = ?'
+);
+$usageStmt->execute([(int) $user['id'], $today]);
+$todayUsage = (int) ($usageStmt->fetch()['total'] ?? 0);
+if ($todayUsage >= DAILY_TOKEN_BUDGET) {
+    http_response_code(429);
+    echo json_encode(['reply' => null, 'error' => '今日 AI 使用額度已達上限，請明天再試。']);
+    exit;
+}
+
+// 6. Consecutive failure lockout (5 errors → 10 min ban)
+$failKey = 'chat_fail_count_' . md5($ip);
+$failCount = (int) ($_SESSION[$failKey] ?? 0);
+$failLockUntil = (int) ($_SESSION[$failKey . '_lock'] ?? 0);
+if ($failLockUntil > 0 && $now < $failLockUntil) {
+    $waitSec = $failLockUntil - $now;
+    http_response_code(429);
+    echo json_encode(['reply' => null, 'error' => "暫時鎖定，請 {$waitSec} 秒後再試。"]);
+    exit;
+}
+
+// 7. Validate page type whitelist (already exists)
 $pageType = trim((string) ($input['page'] ?? ''));
 $validPages = ['home', 'trip', 'editor', 'planner_dashboard', 'traveler_dashboard'];
 $pageType = in_array($pageType, $validPages, true) ? $pageType : 'home';
-$tripData = isset($input['trip_data']) && is_array($input['trip_data']) ? $input['trip_data'] : null;
 
-if ($message === '') {
-    http_response_code(400);
-    echo json_encode(['reply' => null, 'error' => '請輸入訊息']);
-    exit;
+// 8. Sanitize trip_data — only allow expected keys
+$tripData = null;
+if (isset($input['trip_data']) && is_array($input['trip_data'])) {
+    $allowedKeys = ['id', 'title', 'summary', 'address', 'budget', 'currency', 'start_date'];
+    $tripData = array_intersect_key($input['trip_data'], array_flip($allowedKeys));
+    // Truncate each value to 500 chars max
+    foreach ($tripData as $k => $v) {
+        if (is_string($v)) $tripData[$k] = mb_substr($v, 0, 500);
+    }
 }
 
 // ───── Build system prompt ─────
@@ -165,6 +242,21 @@ if ($reply === null && $loopError === null) {
 // If error occurred, use fallback
 if ($loopError !== null) {
     $reply = 'AI 服務暫時無法處理，請稍後再試。';
+    // Increment fail counter
+    $_SESSION[$failKey] = ($_SESSION[$failKey] ?? 0) + 1;
+    if (($_SESSION[$failKey] ?? 0) >= 5) {
+        $_SESSION[$failKey . '_lock'] = $now + 600; // 10 min lockout
+        $_SESSION[$failKey] = 0;
+    }
+}
+
+// Log usage (estimate tokens: ~4 chars per token for Chinese)
+if ($loopError === null) {
+    $tokensUsed = (int) ceil((mb_strlen($message) + mb_strlen($reply ?? '')) / 2);
+    log_ai_usage((int) $user['id'], $ip, $pageType, $tokensUsed, $today);
+    // Reset fail counter on success
+    $_SESSION[$failKey] = 0;
+    $_SESSION[$failKey . '_lock'] = 0;
 }
 
 header('Content-Type: application/json');

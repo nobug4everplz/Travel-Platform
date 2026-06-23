@@ -5,6 +5,16 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/helpers.php';
 
+function _ai_headers(): array
+{
+    $key = app_env('DEEPSEEK_API_KEY');
+    $auth = 'Bearer ' . $key;
+    return [
+        'Content-Type: application/json',
+        'Authorization: ' . $auth,
+    ];
+}
+
 /**
  * Simple chat without tool calling.
  */
@@ -25,7 +35,8 @@ function chat(string $systemPrompt, string $userMessage): array
             ['role' => 'user', 'content' => $userMessage],
         ],
         'stream' => false,
-        'max_tokens' => 2000,
+        'max_tokens' => 1024,
+        'temperature' => 0.7,
     ]);
 
     $ch = curl_init('https://api.deepseek.com/v1/chat/completions');
@@ -33,12 +44,10 @@ function chat(string $systemPrompt, string $userMessage): array
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => $payload,
-        CURLOPT_HTTPHEADER => [
-            'Content-Type: application/json',
-            'Authorization: Bearer ' . $apiKey,
-        ],
+        CURLOPT_HTTPHEADER => _ai_headers(),
         CURLOPT_TIMEOUT => 30,
         CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_SSL_VERIFYPEER => false,
     ]);
 
     $response = curl_exec($ch);
@@ -78,14 +87,6 @@ function chat(string $systemPrompt, string $userMessage): array
 
 /**
  * Chat with tool-calling support.
- *
- * Sends messages + tool definitions to DeepSeek API and parses the response
- * for both text content and tool_calls.
- *
- * @param array $messages Multi-turn message array [{role, content}, ...]
- * @param array $tools    Tool definitions array (output of get_tool_definitions())
- *
- * @return array{reply: ?string, tool_calls: ?array, finish_reason: ?string, error: ?string}
  */
 function chat_with_tools(array $messages, array $tools): array
 {
@@ -102,7 +103,8 @@ function chat_with_tools(array $messages, array $tools): array
         'messages' => $messages,
         'tools' => $tools,
         'stream' => false,
-        'max_tokens' => 4096,
+        'max_tokens' => 2048,
+        'temperature' => 0.7,
     ];
 
     $encoded = json_encode($payload);
@@ -118,12 +120,10 @@ function chat_with_tools(array $messages, array $tools): array
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => $encoded,
-        CURLOPT_HTTPHEADER => [
-            'Content-Type: application/json',
-            'Authorization: Bearer ' . $apiKey,
-        ],
+        CURLOPT_HTTPHEADER => _ai_headers(),
         CURLOPT_TIMEOUT => 60,
         CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_SSL_VERIFYPEER => false,
     ]);
 
     $response = curl_exec($ch);
@@ -166,4 +166,17 @@ function chat_with_tools(array $messages, array $tools): array
         'finish_reason' => $finishReason,
         'error' => null,
     ];
+}
+
+function log_ai_usage(int $userId, string $ip, string $pageType, int $tokensUsed, string $date): void
+{
+    try {
+        $db = pdo();
+        $stmt = $db->prepare(
+            'INSERT INTO ai_usage_log (user_id, ip_hash, page_type, tokens_used, usage_date)
+             VALUES (?, ?, ?, ?, ?)'
+        );
+        $stmt->execute([$userId, md5($ip), $pageType, $tokensUsed, $date]);
+    } catch (\Throwable) {
+    }
 }
