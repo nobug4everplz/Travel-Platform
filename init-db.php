@@ -38,6 +38,14 @@ try {
         address VARCHAR(512) NULL
     )");
 
+    $db->exec("
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='trips_title_author_key') THEN
+            ALTER TABLE trips ADD CONSTRAINT trips_title_author_key UNIQUE (title, author_id);
+        END IF;
+    END $$");
+
     // Trip Spots
     $db->exec("CREATE TABLE IF NOT EXISTS trip_spots (
         id SERIAL PRIMARY KEY,
@@ -165,10 +173,64 @@ try {
     $db->exec("CREATE TABLE IF NOT EXISTS trusted_devices (
         id SERIAL PRIMARY KEY,
         user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        device_token VARCHAR(255) NOT NULL,
-        device_name VARCHAR(255),
-        trusted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        token_hash CHAR(64) NOT NULL,
+        device_label VARCHAR(255) NOT NULL DEFAULT '',
+        user_agent TEXT,
+        first_ip VARCHAR(45),
+        last_ip VARCHAR(45),
+        first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        revoked_at TIMESTAMP NULL
     )");
+
+    // Migration: adjust existing demo table columns (safe re-run)
+    $db->exec("
+    DO $$
+    BEGIN
+        -- Remove deprecated columns if they exist
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trusted_devices' AND column_name='device_name') THEN
+            ALTER TABLE trusted_devices DROP COLUMN device_name;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trusted_devices' AND column_name='trusted_at') THEN
+            ALTER TABLE trusted_devices DROP COLUMN trusted_at;
+        END IF;
+        -- Rename device_token → token_hash if old column exists
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trusted_devices' AND column_name='device_token') THEN
+            ALTER TABLE trusted_devices RENAME COLUMN device_token TO token_hash;
+            ALTER TABLE trusted_devices ALTER COLUMN token_hash SET NOT NULL;
+            ALTER TABLE trusted_devices ALTER COLUMN token_hash TYPE CHAR(64) USING LEFT(token_hash, 64);
+        END IF;
+        -- Add new columns if missing
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trusted_devices' AND column_name='device_label') THEN
+            ALTER TABLE trusted_devices ADD COLUMN device_label VARCHAR(255) NOT NULL DEFAULT '';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trusted_devices' AND column_name='user_agent') THEN
+            ALTER TABLE trusted_devices ADD COLUMN user_agent TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trusted_devices' AND column_name='first_ip') THEN
+            ALTER TABLE trusted_devices ADD COLUMN first_ip VARCHAR(45);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trusted_devices' AND column_name='last_ip') THEN
+            ALTER TABLE trusted_devices ADD COLUMN last_ip VARCHAR(45);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trusted_devices' AND column_name='first_seen_at') THEN
+            ALTER TABLE trusted_devices ADD COLUMN first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trusted_devices' AND column_name='last_seen_at') THEN
+            ALTER TABLE trusted_devices ADD COLUMN last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trusted_devices' AND column_name='expires_at') THEN
+            ALTER TABLE trusted_devices ADD COLUMN expires_at TIMESTAMP NOT NULL DEFAULT (NOW() + INTERVAL '30 days');
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trusted_devices' AND column_name='revoked_at') THEN
+            ALTER TABLE trusted_devices ADD COLUMN revoked_at TIMESTAMP NULL;
+        END IF;
+        -- Add UNIQUE on token_hash if missing
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='trusted_devices_token_hash_key') THEN
+            ALTER TABLE trusted_devices ADD UNIQUE (token_hash);
+        END IF;
+    END $$");
 
     // === SEED DATA ===
     $hash = password_hash('password123', PASSWORD_DEFAULT);

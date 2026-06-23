@@ -10,7 +10,7 @@
 -- ============================================================
 
 ALTER TABLE trusted_devices
-  ADD COLUMN IF NOT EXISTS token_hash VARCHAR(255);
+  ADD COLUMN IF NOT EXISTS token_hash CHAR(64);
 
 -- Add a unique constraint on token_hash.
 -- PostgreSQL allows multiple NULLs in unique constraints,

@@ -37,6 +37,7 @@ if ($pageType !== '') {
             <?php if ($currentUser['role'] === 'planner'): ?>
                 <a href="/editor.php">新增行程</a>
             <?php endif; ?>
+            <span class="user-name"><?= e($currentUser['name']) ?></span>
             <form method="post" action="/actions/logout.php" class="inline-form">
                 <?= csrf_field() ?>
                 <button class="link-button" type="submit">登出</button>
