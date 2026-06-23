@@ -9,32 +9,32 @@ function admin_analytics(): array
     $metrics = pdo()->query(
         "SELECT
             (SELECT COUNT(*) FROM users) AS user_count,
-            (SELECT COUNT(*) FROM users WHERE DATE(created_at) = CURDATE()) AS registered_today,
-            (SELECT COUNT(DISTINCT user_id) FROM login_events WHERE DATE(logged_in_at) = CURDATE()) AS dau,
-            (SELECT COUNT(DISTINCT user_id) FROM login_events WHERE logged_in_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)) AS wau,
-            (SELECT COUNT(DISTINCT user_id) FROM login_events WHERE logged_in_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)) AS mau,
-            (SELECT COUNT(*) FROM email_delivery_logs WHERE DATE(created_at) = CURDATE() AND status = 'sent') AS emails_sent_today,
-            (SELECT COUNT(*) FROM email_delivery_logs WHERE DATE(created_at) = CURDATE() AND status = 'failed') AS emails_failed_today"
+            (SELECT COUNT(*) FROM users WHERE created_at::date = CURRENT_DATE) AS registered_today,
+            (SELECT COUNT(DISTINCT user_id) FROM login_events WHERE logged_in_at::date = CURRENT_DATE) AS dau,
+            (SELECT COUNT(DISTINCT user_id) FROM login_events WHERE logged_in_at >= CURRENT_DATE - INTERVAL '7 days') AS wau,
+            (SELECT COUNT(DISTINCT user_id) FROM login_events WHERE logged_in_at >= CURRENT_DATE - INTERVAL '30 days') AS mau,
+            (SELECT COUNT(*) FROM email_delivery_logs WHERE created_at::date = CURRENT_DATE AND status = 'sent') AS emails_sent_today,
+            (SELECT COUNT(*) FROM email_delivery_logs WHERE created_at::date = CURRENT_DATE AND status = 'failed') AS emails_failed_today"
     )->fetch();
 
     $trend = pdo()->query(
         "SELECT dates.day, COUNT(DISTINCT le.user_id) AS active_users
          FROM (
-            SELECT CURDATE() AS day UNION ALL SELECT DATE_SUB(CURDATE(), INTERVAL 1 DAY)
-            UNION ALL SELECT DATE_SUB(CURDATE(), INTERVAL 2 DAY)
-            UNION ALL SELECT DATE_SUB(CURDATE(), INTERVAL 3 DAY)
-            UNION ALL SELECT DATE_SUB(CURDATE(), INTERVAL 4 DAY)
-            UNION ALL SELECT DATE_SUB(CURDATE(), INTERVAL 5 DAY)
-            UNION ALL SELECT DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+            SELECT CURRENT_DATE AS day UNION ALL SELECT CURRENT_DATE - INTERVAL '1 day'
+            UNION ALL SELECT CURRENT_DATE - INTERVAL '2 days'
+            UNION ALL SELECT CURRENT_DATE - INTERVAL '3 days'
+            UNION ALL SELECT CURRENT_DATE - INTERVAL '4 days'
+            UNION ALL SELECT CURRENT_DATE - INTERVAL '5 days'
+            UNION ALL SELECT CURRENT_DATE - INTERVAL '6 days'
          ) dates
-         LEFT JOIN login_events le ON DATE(le.logged_in_at) = dates.day
+         LEFT JOIN login_events le ON le.logged_in_at::date = dates.day
          GROUP BY dates.day ORDER BY dates.day ASC"
     )->fetchAll();
 
     $roles = pdo()->query(
         "SELECT u.role, COUNT(DISTINCT le.user_id) AS active_users
          FROM users u
-         LEFT JOIN login_events le ON le.user_id = u.id AND le.logged_in_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+         LEFT JOIN login_events le ON le.user_id = u.id AND le.logged_in_at >= CURRENT_DATE - INTERVAL '30 days'
          GROUP BY u.role ORDER BY u.role"
     )->fetchAll();
 
