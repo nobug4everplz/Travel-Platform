@@ -322,7 +322,7 @@ function handle_get_planner_stats(array $args, array $user): array
     $stmt = pdo()->prepare(
         'SELECT
             (SELECT COUNT(*) FROM trips WHERE author_id = ? AND is_published = 1) AS published_count,
-            (SELECT COUNT(*) FROM trips WHERE author_id = ? AND is_published = false) AS draft_count,
+            (SELECT COUNT(*) FROM trips WHERE author_id = ? AND is_published = 0) AS draft_count,
             (SELECT COUNT(*) FROM favorite_planners WHERE planner_id = ?) AS follower_count,
             (SELECT COUNT(*) FROM reviews r JOIN trips t ON t.id = r.trip_id WHERE t.author_id = ?) AS review_count,
             (SELECT ROUND(AVG(t.average_rating), 1) FROM trips t WHERE t.author_id = ? AND t.is_published = 1 AND t.review_count > 0) AS avg_rating'
