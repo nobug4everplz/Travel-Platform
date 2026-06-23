@@ -41,6 +41,25 @@ function pdo(): PDO
 
     load_env_file(__DIR__ . '/../.env');
 
+    // Fly.io: use DATABASE_URL (PostgreSQL)
+    $dbUrl = getenv('DATABASE_URL');
+    if ($dbUrl && $dbUrl !== '') {
+        $parts = parse_url($dbUrl);
+        $host = $parts['host'] ?? 'localhost';
+        $port = $parts['port'] ?? '5432';
+        $database = ltrim($parts['path'] ?? 'travel_platform_demo', '/');
+        $user = $parts['user'] ?? 'postgres';
+        $password = $parts['pass'] ?? '';
+
+        $dsn = sprintf('pgsql:host=%s;port=%s;dbname=%s', $host, $port, $database);
+        $pdo = new PDO($dsn, $user, $password, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+        return $pdo;
+    }
+
+    // Local: MySQL fallback
     $host = getenv('DB_HOST') ?: '127.0.0.1';
     $port = getenv('DB_PORT') ?: '3306';
     $database = getenv('DB_NAME') ?: 'travel_platform_db';
