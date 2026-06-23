@@ -157,7 +157,7 @@ try {
         subject VARCHAR(255),
         status VARCHAR(20),
         error_message TEXT,
-        sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
 
     // Notification Preferences
@@ -331,6 +331,16 @@ try {
         IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trip_participations' AND column_name='created_at')
            AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trip_participations' AND column_name='joined_at') THEN
             ALTER TABLE trip_participations RENAME COLUMN created_at TO joined_at;
+        END IF;
+    END $$");
+
+    // email_delivery_logs: rename sent_at -> created_at
+    $db->exec("
+    DO $$
+    BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='email_delivery_logs' AND column_name='sent_at')
+           AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='email_delivery_logs' AND column_name='created_at') THEN
+            ALTER TABLE email_delivery_logs RENAME COLUMN sent_at TO created_at;
         END IF;
     END $$");
 
