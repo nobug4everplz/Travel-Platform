@@ -65,11 +65,13 @@ $pageType = 'traveler_dashboard';
 
 // Footprint map: participated trips with coordinates
 $footprintTrips = pdo()->prepare(
-    'SELECT DISTINCT t.id, t.title, t.latitude, t.longitude, t.average_rating, t.summary
+    'SELECT t.id, t.title, t.latitude, t.longitude, t.average_rating, t.summary,
+            MAX(tp.joined_at) AS joined_at
      FROM trip_participations tp
      JOIN trips t ON t.id = tp.trip_id
      WHERE tp.user_id = ? AND t.latitude IS NOT NULL AND t.longitude IS NOT NULL
-     ORDER BY tp.joined_at DESC'
+     GROUP BY t.id, t.title, t.latitude, t.longitude, t.average_rating, t.summary
+     ORDER BY joined_at DESC'
 );
 $footprintTrips->execute([$user['id']]);
 $footprintTripRows = $footprintTrips->fetchAll();
