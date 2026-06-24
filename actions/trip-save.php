@@ -63,6 +63,7 @@ $stmt = pdo()->prepare('INSERT INTO trips (title, summary, cover_image, latitude
 $stmt->execute([$title, $summary, $coverImage, $latitude, $longitude, $address, $placeId, $isPublished, $user['id']]);
 $newTripId = (int) pdo()->lastInsertId();
 save_trip_spots($newTripId, $_POST['spots'] ?? []);
+save_trip_gear($newTripId, (array) ($_POST['gear'] ?? []));
 
 flash('success', $isPublished ? '行程已建立並發布。' : '行程草稿已建立。');
 redirect('/editor.php?id=' . $newTripId);

@@ -87,7 +87,7 @@ require __DIR__ . '/../partials/header.php';
             <button class="primary" type="submit" name="intent" value="publish">發布行程</button>
         </div>
 
-    <?php if ($trip && $hasEditorGear): ?>
+    <?php if ($hasEditorGear): ?>
     <section class="panel" style="margin-top:1.5rem;">
         <h2>建議裝備</h2>
 
@@ -114,7 +114,7 @@ require __DIR__ . '/../partials/header.php';
 
         <button class="small" type="button" onclick="addGearRow()">＋ 新增裝備</button>
     </section>
-    <?php elseif ($trip): ?>
+    <?php else: ?>
     <section class="panel" style="margin-top:1.5rem;">
         <h2>建議裝備</h2>
         <div id="gear-list" style="margin-bottom:16px;">
@@ -123,11 +123,7 @@ require __DIR__ . '/../partials/header.php';
         <button class="small" type="button" onclick="addGearRow()">＋ 新增裝備</button>
     </section>
     <?php endif; ?>
-    </form>
-</section>
 
-<?php if ($trip): ?>
-<section class="panel">
     <div class="section-heading">
         <div><p class="eyebrow">Spots</p><h2>行程景點</h2></div>
         <button class="button small" type="button" onclick="addSpotRow()">+ 新增景點</button>
@@ -198,9 +194,10 @@ function addGearRow() {
         '  <button class="danger small" type="button" onclick="this.closest(\'.gear-item\').remove()">刪除</button>' +
         '</div>';
     document.getElementById('gear-list').appendChild(div);
-}
-</script>
-<?php endif; ?>
+    }
+    </script>
+        </form>
+    </section>
 
 <script>
 // Spot row counter (for new spots)
