@@ -57,7 +57,8 @@ try {
         place_id VARCHAR(255),
         address VARCHAR(512),
         notes TEXT,
-        google_maps_url VARCHAR(2048)
+        google_maps_url VARCHAR(2048),
+        UNIQUE(trip_id, name)
     )");
 
     // Trip Gear
@@ -344,6 +345,17 @@ try {
         END IF;
     END $$");
 
+    // trip_spots: cleanup duplicates before UNIQUE constraint
+    $db->exec("
+    DO $$
+    BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='trip_spots' AND table_type='BASE TABLE') THEN
+            DELETE FROM trip_spots WHERE id NOT IN (
+                SELECT MIN(id) FROM trip_spots GROUP BY trip_id, name
+            );
+        END IF;
+    END $$");
+
     // === SEED DATA ===
     $hash = password_hash('password123', PASSWORD_DEFAULT);
 
@@ -364,7 +376,7 @@ try {
     $db->exec("INSERT INTO trip_spots (trip_id, name, address, notes, sort_order, latitude, longitude) VALUES
         (2, 'Kiyomizu-dera', 'Higashiyama, Kyoto', 'UNESCO temple with panoramic views', 1, 34.9949, 135.7850),
         (2, 'Fushimi Inari', 'Fushimi, Kyoto', 'Thousands of red torii gates', 2, 34.9671, 135.7727)
-    ON CONFLICT DO NOTHING");
+    ON CONFLICT (trip_id, name) DO NOTHING");
 
     // Seed participations
     $db->exec("INSERT INTO trip_participations (trip_id, user_id) VALUES (2, 2) ON CONFLICT DO NOTHING");

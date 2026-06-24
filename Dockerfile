@@ -8,9 +8,11 @@ RUN apt-get update && apt-get install -y libpq-dev && rm -rf /var/lib/apt/lists/
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo pdo_mysql pdo_pgsql
+RUN docker-php-ext-install opcache
 
 # Copy app
 COPY . /var/www/html/
+COPY opcache.ini /usr/local/etc/php/conf.d/opcache.ini
 
 # Set document root to public/
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
