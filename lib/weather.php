@@ -205,3 +205,105 @@ function extract_city_from_address(string $address): string
     // Fallback: first 3 chars (for non-TW addresses without comma)
     return mb_substr(trim($address), 0, 6);
 }
+
+/**
+ * Fetch both current weather + 3-day forecast in a single API call with file caching.
+ *
+ * Cache keyed by lowercased/trimmed city name (md5 hash).
+ * Cache TTL: 30 minutes — avoids redundant API calls while keeping data fresh.
+ *
+ * @return array{current: array, forecast: list<array>}|null
+ *   current:  ['temp' => float, 'description' => string, 'icon' => string]
+ *   forecast: list of ['date' => string, 'temp_high' => float, 'temp_low' => float, 'description' => string, 'icon' => string]
+ */
+function get_weather_all(string $city): ?array
+{
+    $cityKey = strtolower(trim($city));
+    $cacheFile = __DIR__ . '/../cache/weather_' . md5($cityKey) . '.json';
+
+    // ── Check cache ──
+    if (file_exists($cacheFile) && filemtime($cacheFile) > time() - 1800) {
+        $cached = @json_decode(file_get_contents($cacheFile), true);
+        if (is_array($cached)) {
+            return $cached;
+        }
+    }
+
+    // ── Geocode ──
+    $geo = geocode_city($city);
+    if ($geo === null) {
+        return null;
+    }
+
+    // ── Single API call for current + daily forecast ──
+    $url = sprintf(
+        'https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&forecast_days=3&timezone=auto',
+        $geo['lat'],
+        $geo['lng']
+    );
+
+    $ctx = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'timeout' => 5,
+            'ignore_errors' => true,
+        ],
+    ]);
+
+    $body = @file_get_contents($url, false, $ctx);
+    if ($body === false) {
+        return null;
+    }
+
+    $data = json_decode($body, true);
+    if (!is_array($data)) {
+        return null;
+    }
+
+    // ── Parse current ──
+    $current = null;
+    if (isset($data['current']['temperature_2m'], $data['current']['weather_code'])) {
+        [$desc, $icon] = wmo_to_weather((int) $data['current']['weather_code']);
+        $current = [
+            'temp' => (float) $data['current']['temperature_2m'],
+            'description' => $desc,
+            'icon' => $icon,
+        ];
+    }
+
+    // ── Parse forecast ──
+    $forecast = null;
+    if (isset($data['daily']['time']) && is_array($data['daily']['time'])) {
+        $forecast = [];
+        $count = count($data['daily']['time']);
+        for ($i = 0; $i < $count; $i++) {
+            $code = (int) ($data['daily']['weather_code'][$i] ?? 0);
+            [$desc, $icon] = wmo_to_weather($code);
+            $forecast[] = [
+                'date' => (string) $data['daily']['time'][$i],
+                'temp_high' => (float) ($data['daily']['temperature_2m_max'][$i] ?? 0),
+                'temp_low' => (float) ($data['daily']['temperature_2m_min'][$i] ?? 0),
+                'description' => $desc,
+                'icon' => $icon,
+            ];
+        }
+    }
+
+    if ($current === null && $forecast === null) {
+        return null;
+    }
+
+    $result = [
+        'current' => $current,
+        'forecast' => $forecast,
+    ];
+
+    // ── Write cache ──
+    $cacheDir = __DIR__ . '/../cache';
+    if (!is_dir($cacheDir)) {
+        @mkdir($cacheDir, 0755, true);
+    }
+    @file_put_contents($cacheFile, json_encode($result, JSON_UNESCAPED_UNICODE));
+
+    return $result;
+}

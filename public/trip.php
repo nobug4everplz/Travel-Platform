@@ -260,9 +260,12 @@ $weatherForecast = null;
 if (!empty($trip['address'])) {
     $city = extract_city_from_address($trip['address']);
     if ($city !== '') {
-        $weatherNow = get_weather($city);
-        $weatherForecast = get_forecast($city);
-        $hasWeather = $weatherNow !== null;
+        $weatherAll = get_weather_all($city);
+        if ($weatherAll !== null) {
+            $weatherNow = $weatherAll['current'];
+            $weatherForecast = $weatherAll['forecast'];
+            $hasWeather = $weatherNow !== null;
+        }
     }
 }
 ?>
