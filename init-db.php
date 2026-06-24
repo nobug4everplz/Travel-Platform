@@ -345,14 +345,13 @@ try {
         END IF;
     END $$");
 
-    // trip_spots: cleanup duplicates before UNIQUE constraint
+    // trip_spots: cleanup duplicates + add UNIQUE constraint (migration)
     $db->exec("
     DO $$
     BEGIN
-        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='trip_spots' AND table_type='BASE TABLE') THEN
-            DELETE FROM trip_spots WHERE id NOT IN (
-                SELECT MIN(id) FROM trip_spots GROUP BY trip_id, name
-            );
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='trip_spots_trip_id_name_key') THEN
+            DELETE FROM trip_spots WHERE id NOT IN (SELECT MIN(id) FROM trip_spots GROUP BY trip_id, name);
+            ALTER TABLE trip_spots ADD CONSTRAINT trip_spots_trip_id_name_key UNIQUE (trip_id, name);
         END IF;
     END $$");
 
