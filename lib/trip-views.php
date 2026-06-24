@@ -31,9 +31,8 @@ function record_trip_unique_view(array $trip, ?array $viewer): void
     $viewerKeyHash = trip_viewer_key_hash($viewer);
     try {
         $stmt = pdo()->prepare(
-            'INSERT INTO trip_daily_unique_views (trip_id, view_date, viewer_key_hash)
-             VALUES (?, ?, ?)
-             ON CONFLICT (trip_id, view_date, viewer_key_hash) DO NOTHING'
+            'INSERT IGNORE INTO trip_daily_unique_views (trip_id, view_date, viewer_key_hash)
+             VALUES (?, ?, ?)'
         );
         $stmt->execute([(int) $trip['id'], date('Y-m-d'), $viewerKeyHash]);
     } catch (PDOException) {
