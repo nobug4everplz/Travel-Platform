@@ -36,7 +36,7 @@ if ($intent === 'remove') {
     $stmt->execute([$user['id'], $plannerId]);
     flash('success', '已取消收藏規劃師。');
 } else {
-    $stmt = pdo()->prepare('INSERT IGNORE INTO favorite_planners (traveler_id, planner_id) VALUES (?, ?)');
+    $stmt = pdo()->prepare('INSERT INTO favorite_planners (traveler_id, planner_id) VALUES (?, ?) ON CONFLICT (traveler_id, planner_id) DO NOTHING');
     $stmt->execute([$user['id'], $plannerId]);
     flash('success', '已收藏規劃師。');
 }

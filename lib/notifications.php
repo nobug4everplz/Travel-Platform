@@ -11,8 +11,9 @@ function ensure_notification_preferences(array $user): void
     }
 
     $stmt = pdo()->prepare(
-        'INSERT IGNORE INTO notification_preferences (user_id)
-         VALUES (?)'
+        'INSERT INTO notification_preferences (user_id)
+         VALUES (?)
+         ON CONFLICT (user_id) DO NOTHING'
     );
     $stmt->execute([(int) $user['id']]);
 }

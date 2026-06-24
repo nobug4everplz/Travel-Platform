@@ -36,7 +36,7 @@ if ($intent === 'remove') {
     $stmt->execute([$user['id'], $tripId]);
     flash('success', '已取消收藏行程。');
 } else {
-    $stmt = pdo()->prepare('INSERT IGNORE INTO favorite_trips (user_id, trip_id) VALUES (?, ?)');
+    $stmt = pdo()->prepare('INSERT INTO favorite_trips (user_id, trip_id) VALUES (?, ?) ON CONFLICT (user_id, trip_id) DO NOTHING');
     $stmt->execute([$user['id'], $tripId]);
     flash('success', '已收藏行程。');
 }
