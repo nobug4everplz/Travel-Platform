@@ -270,7 +270,7 @@ if (!empty($trip['address'])) {
 <section class="panel">
     <div class="section-heading"><div><p class="eyebrow">Weather</p><h2>當地天氣</h2></div></div>
     <div class="weather-current" style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;">
-        <img src="https://openweathermap.org/img/wn/<?= e($weatherNow['icon']) ?>@2x.png" alt="<?= e($weatherNow['description']) ?>" style="width:60px;height:60px;">
+        <span style="font-size:60px;"><?= e($weatherNow['icon']) ?></span>
         <div>
             <span style="font-size:2rem;font-weight:700;"><?= round($weatherNow['temp']) ?>°C</span>
             <span style="color:#666;"><?= e($weatherNow['description']) ?></span>
@@ -281,7 +281,7 @@ if (!empty($trip['address'])) {
         <?php foreach ($weatherForecast as $day): ?>
         <div class="card"><div class="card-body" style="text-align:center;">
             <p class="muted" style="margin-bottom:0.25rem;"><?= e(date('m/d', strtotime($day['date']))) ?></p>
-            <img src="https://openweathermap.org/img/wn/<?= e($day['icon']) ?>.png" alt="<?= e($day['description']) ?>" style="width:50px;height:50px;">
+            <span style="font-size:50px;"><?= e($day['icon']) ?></span>
             <p style="margin:0;"><strong><?= round($day['temp_high']) ?>°</strong> / <?= round($day['temp_low']) ?>°</p>
             <p class="muted" style="font-size:13px;"><?= e($day['description']) ?></p>
         </div></div>
