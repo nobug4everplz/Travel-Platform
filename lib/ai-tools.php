@@ -73,7 +73,7 @@ function get_tool_definitions(): array
                 'description' => '取得目前登入規劃師的儀表板統計資料（發布數、草稿數、收藏者、評分等）。僅限規劃師角色使用。',
                 'parameters'  => [
                     'type'       => 'object',
-                    'properties' => [],
+                    'properties' => (object) [],
                 ],
             ],
         ],
@@ -88,7 +88,7 @@ function get_tool_definitions(): array
                 'description' => '取得旅行者的足跡摘要與統計（參加行程數、收藏數、手動足跡等）。僅限旅人角色使用。',
                 'parameters'  => [
                     'type'       => 'object',
-                    'properties' => [],
+                    'properties' => (object) [],
                 ],
             ],
         ],
