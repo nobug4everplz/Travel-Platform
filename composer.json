@@ -9,7 +9,8 @@
         "ext-pdo": "*",
         "ext-pdo_mysql": "*",
         "ext-session": "*",
-        "phpmailer/phpmailer": "^6.10"
+        "phpmailer/phpmailer": "^6.10",
+        "tecnickcom/tcpdf": "^6.11"
     },
     "scripts": {
         "serve": "php -S localhost:8000 -t public public/router.php",
