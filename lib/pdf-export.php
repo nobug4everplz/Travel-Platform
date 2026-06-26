@@ -69,8 +69,6 @@ class PdfDocument
     private int $pageCount = 0;
     private array $pageContentObjs = [];
     private array $xObjects = []; // image objects
-    private array $glyphMapNormal = []; // Unicode→glyphID for normal font
-    private array $glyphMapBold = [];   // Unicode→glyphID for bold font
 
     public function __construct()
     {
@@ -173,8 +171,7 @@ class PdfDocument
     public function writeText(string $text, bool $bold = false): void
     {
         $fontNum = $bold ? $this->fontBoldObjNum : $this->fontNormalObjNum;
-        $glyphMap = $bold ? $this->glyphMapBold : $this->glyphMapNormal;
-        $hex = $this->textToGlyphHex($text, $glyphMap);
+        $hex = $this->utf8ToUtf16BeHex($text);
         $xPt = $this->mmToPoint($this->cursorX);
         $yPt = $this->mmToPoint($this->cursorY);
         $pdfY = $this->mmToPoint($this->pageH) - $yPt;
@@ -319,23 +316,7 @@ class PdfDocument
         return $map;
     }
 
-    /**
-     * Convert UTF-8 text to hex glyph IDs using the font's cmap.
-     */
-    private function textToGlyphHex(string $text, array $glyphMap): string
-    {
-        $text = preg_replace('/[^\x{0000}-\x{FFFF}]/u', '', $text);
-        $hex = '';
-        $chars = preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY);
-        foreach ($chars as $ch) {
-            $code = mb_ord($ch, 'UTF-8');
-            $gid = $glyphMap[$code] ?? 0;
-            $hex .= sprintf('%04X', $gid);
-        }
-        return $hex;
-    }
-
-    private function escPdfString(string $s): string
+    private function escPdfString
     {
         // Escape special PDF string characters
         $s = str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $s);
@@ -375,11 +356,6 @@ class PdfDocument
 
         // ── Build Unicode→glyph map from cmap ──
         $glyphMap = self::buildGlyphMap($ttfData);
-        if (strpos($pdfFontName, 'Bold') !== false) {
-            $this->glyphMapBold = $glyphMap;
-        } else {
-            $this->glyphMapNormal = $glyphMap;
-        }
 
         // ── FontDescriptor metrics (Noto Sans TC hardcoded) ──
         $ascent = 1160;
@@ -390,13 +366,24 @@ class PdfDocument
         $ttfObj = "{$fontFileObjNum} 0 obj\n<< /Length {$compLen} /Filter /FlateDecode /Length1 {$origLen} >>\nstream\n{$compressed}\nendstream\nendobj\n";
         $this->objects[] = $ttfObj;
 
+        // ── Build CIDToGIDMap stream (maps Unicode CID → glyph index) ──
+        $cidToGidObjNum = $this->allocObjNum();
+        $cidToGidData = '';
+        for ($cid = 0; $cid <= 65535; $cid++) {
+            $gid = $glyphMap[$cid] ?? 0;
+            $cidToGidData .= chr(($gid >> 8) & 0xFF) . chr($gid & 0xFF);
+        }
+        $cidToGidCompressed = gzcompress($cidToGidData, 9);
+        $cidToGidObj = "{$cidToGidObjNum} 0 obj\n<< /Length " . strlen($cidToGidCompressed) . " /Filter /FlateDecode >>\nstream\n{$cidToGidCompressed}\nendstream\nendobj\n";
+        $this->objects[] = $cidToGidObj;
+
         // ── FontDescriptor ──
         $descObj = "{$descObjNum} 0 obj\n<< /Type /FontDescriptor /FontName /{$pdfFontName} /Flags 4 /FontBBox [-1002 -1048 2928 1808] /ItalicAngle 0 /Ascent {$ascent} /Descent {$descent} /CapHeight {$capHeight} /StemV 76 /FontFile2 {$fontFileObjNum} 0 R >>\nendobj\n";
         $this->objects[] = $descObj;
 
         // ── CIDFontType2 ──
         // /DW 1000 = default glyph width for CJK (full-width)
-        $cidFont = "{$cidFontObjNum} 0 obj\n<< /Type /Font /Subtype /CIDFontType2 /BaseFont /{$pdfFontName} /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor {$descObjNum} 0 R /DW 1000 >>\nendobj\n";
+        $cidFont = "{$cidFontObjNum} 0 obj\n<< /Type /Font /Subtype /CIDFontType2 /BaseFont /{$pdfFontName} /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor {$descObjNum} 0 R /CIDToGIDMap {$cidToGidObjNum} 0 R /DW 1000 >>\nendobj\n";
         $this->objects[] = $cidFont;
 
         // ── Type0 font with Identity-H ──
