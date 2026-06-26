@@ -14,9 +14,9 @@ $user = require_role(['traveler', 'planner']);
 
 ensure_notification_preferences($user);
 
-$popularDigestEnabled = isset($_POST['popular_digest_enabled']) ? true : false;
-$plannerDigestEnabled = $user['role'] === 'planner' && isset($_POST['planner_digest_enabled']) ? true : false;
-$winbackEnabled = isset($_POST['winback_enabled']) ? true : false;
+$popularDigestEnabled = isset($_POST['popular_digest_enabled']) ? 'true' : 'false';
+$plannerDigestEnabled = $user['role'] === 'planner' && isset($_POST['planner_digest_enabled']) ? 'true' : 'false';
+$winbackEnabled = isset($_POST['winback_enabled']) ? 'true' : 'false';
 
 $stmt = pdo()->prepare(
     'UPDATE notification_preferences
