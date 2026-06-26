@@ -244,6 +244,8 @@ class PdfDocument
 
     private function utf8ToUtf16BeHex(string $text): string
     {
+        // Filter out non-BMP characters (emoji, etc.) that break CID font encoding
+        $text = preg_replace('/[^\x{0000}-\x{FFFF}]/u', '', $text);
         $utf16 = mb_convert_encoding($text, 'UTF-16BE', 'UTF-8');
         return strtoupper(bin2hex($utf16));
     }
