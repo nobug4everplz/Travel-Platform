@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y libpq-dev && rm -rf /var/lib/apt/lists/
 # Install PHP extensions
 RUN docker-php-ext-install pdo pdo_mysql pdo_pgsql
 RUN docker-php-ext-install opcache
+RUN apt-get update && apt-get install -y libfreetype6-dev libjpeg62-turbo-dev libpng-dev && docker-php-ext-configure gd --with-freetype --with-jpeg && docker-php-ext-install gd && rm -rf /var/lib/apt/lists/*
 
 # Copy app
 COPY . /var/www/html/
