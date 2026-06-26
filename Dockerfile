@@ -28,8 +28,8 @@ RUN mkdir -p /var/www/html/cache /var/www/html/uploads/photos && chmod 777 /var/
 # Symlink uploads into public/ so Apache (doc root = public/) can serve static files
 RUN ln -sf /var/www/html/uploads /var/www/html/public/uploads
 
-# Startup script
-RUN echo '#!/bin/sh\nphp /var/www/html/init-db.php\nexec apache2-foreground' > /start.sh && chmod +x /start.sh
+# Startup script — ensure uploads dir exists and is writable by www-data
+RUN echo '#!/bin/sh\nmkdir -p /var/www/html/uploads/photos\nchown -R www-data:www-data /var/www/html/uploads\nphp /var/www/html/init-db.php\nexec apache2-foreground' > /start.sh && chmod +x /start.sh
 
 EXPOSE 80
 CMD ["/start.sh"]
