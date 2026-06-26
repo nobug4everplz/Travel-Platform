@@ -2,6 +2,10 @@ app = "travel-platform-demo"
 
 [build]
 
+[[mounts]]
+  source = "travel_uploads"
+  destination = "/var/www/html/uploads"
+
 [env]
   PORT = "8080"
   APP_TIMEZONE = "Asia/Taipei"

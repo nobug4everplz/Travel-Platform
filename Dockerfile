@@ -25,6 +25,9 @@ RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/Allo
 # Create cache/uploads dirs
 RUN mkdir -p /var/www/html/cache /var/www/html/uploads/photos && chmod 777 /var/www/html/cache /var/www/html/uploads /var/www/html/uploads/photos
 
+# Symlink uploads into public/ so Apache (doc root = public/) can serve static files
+RUN ln -sf /var/www/html/uploads /var/www/html/public/uploads
+
 # Startup script
 RUN echo '#!/bin/sh\nphp /var/www/html/init-db.php\nexec apache2-foreground' > /start.sh && chmod +x /start.sh
 
