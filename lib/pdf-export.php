@@ -69,6 +69,8 @@ class PdfDocument
     private int $pageCount = 0;
     private array $pageContentObjs = [];
     private array $xObjects = []; // image objects
+    private array $glyphMapNormal = []; // Unicode→glyphID for normal font
+    private array $glyphMapBold = [];   // Unicode→glyphID for bold font
 
     public function __construct()
     {
@@ -171,10 +173,10 @@ class PdfDocument
     public function writeText(string $text, bool $bold = false): void
     {
         $fontNum = $bold ? $this->fontBoldObjNum : $this->fontNormalObjNum;
-        $hex = $this->utf8ToUtf16BeHex($text);
+        $glyphMap = $bold ? $this->glyphMapBold : $this->glyphMapNormal;
+        $hex = $this->textToGlyphHex($text, $glyphMap);
         $xPt = $this->mmToPoint($this->cursorX);
         $yPt = $this->mmToPoint($this->cursorY);
-        // PDF y is from bottom
         $pdfY = $this->mmToPoint($this->pageH) - $yPt;
 
         $this->contentBuf .= "BT\n/F{$fontNum} {$this->mmToPoint(3.5)} Tf\n{$xPt} {$pdfY} Td\n<{$hex}> Tj\nET\n";
@@ -250,6 +252,89 @@ class PdfDocument
         return strtoupper(bin2hex($utf16));
     }
 
+    /**
+     * Build a Unicode→glyph-index map from TrueType cmap table (format 4 or 12).
+     * Returns array [unicode_codepoint => glyph_index].
+     */
+    private static function buildGlyphMap(string $ttfData): array
+    {
+        if (strlen($ttfData) < 12) return [];
+        $numTables = unpack('n', substr($ttfData, 4, 2))[1];
+        $cmapOff = null;
+        for ($i = 0; $i < $numTables; $i++) {
+            $rec = substr($ttfData, 12 + $i * 16, 16);
+            if (substr($rec, 0, 4) === 'cmap') {
+                $cmapOff = unpack('N', substr($rec, 8, 4))[1];
+                break;
+            }
+        }
+        if ($cmapOff === null) return [];
+
+        $numSub = unpack('n', substr($ttfData, $cmapOff + 2, 2))[1];
+        $bestOff = null;
+        for ($i = 0; $i < $numSub; $i++) {
+            $rec = substr($ttfData, $cmapOff + 4 + $i * 8, 8);
+            $plat = unpack('n', substr($rec, 0, 2))[1];
+            $enc  = unpack('n', substr($rec, 2, 2))[1];
+            $off  = unpack('N', substr($rec, 4, 4))[1];
+            $fmt  = unpack('n', substr($ttfData, $cmapOff + $off, 2))[1];
+            if (($plat === 3 || $plat === 0) && ($enc === 1 || $enc === 10 || $enc === 0) && $fmt === 4) {
+                $bestOff = $cmapOff + $off;
+                break;
+            }
+        }
+        if ($bestOff === null) return [];
+
+        $segCountX2 = unpack('n', substr($ttfData, $bestOff + 6, 2))[1];
+        $segCount = (int)($segCountX2 / 2);
+        $map = [];
+        $pos = $bestOff + 14;
+        $endCodes = unpack("n{$segCount}", substr($ttfData, $pos, $segCount * 2));
+        $pos += $segCount * 2 + 2; // +2 skip reservedPad
+        $startCodes = unpack("n{$segCount}", substr($ttfData, $pos, $segCount * 2));
+        $pos += $segCount * 2;
+        $idDeltas = unpack("n{$segCount}", substr($ttfData, $pos, $segCount * 2));
+        // Convert to signed
+        foreach ($idDeltas as $k => $v) { if ($v >= 32768) $idDeltas[$k] = $v - 65536; }
+        $pos += $segCount * 2;
+        $idRangeOffsets = unpack("n{$segCount}", substr($ttfData, $pos, $segCount * 2));
+        $glyphIdBase = $pos + $segCount * 2;
+
+        for ($seg = 0; $seg < $segCount; $seg++) {
+            $start = $startCodes[$seg + 1];
+            $end = $endCodes[$seg + 1];
+            if ($start === 0xFFFF) break;
+            for ($code = $start; $code <= $end; $code++) {
+                if ($idRangeOffsets[$seg + 1] === 0) {
+                    $gid = ($code + $idDeltas[$seg + 1]) & 0xFFFF;
+                } else {
+                    $idx = (int)($idRangeOffsets[$seg + 1] / 2) + ($code - $start) - ($segCount - $seg);
+                    $goff = $glyphIdBase + $idx * 2;
+                    $gid = unpack('n', substr($ttfData, $goff, 2))[1];
+                    if ($gid !== 0) $gid = ($gid + $idDeltas[$seg + 1]) & 0xFFFF;
+                }
+                if ($gid !== 0) $map[$code] = $gid;
+            }
+        }
+        return $map;
+    }
+
+    /**
+     * Convert UTF-8 text to hex glyph IDs using the font's cmap.
+     */
+    private function textToGlyphHex(string $text, array $glyphMap): string
+    {
+        $text = preg_replace('/[^\x{0000}-\x{FFFF}]/u', '', $text);
+        $hex = '';
+        $chars = preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY);
+        foreach ($chars as $ch) {
+            $code = mb_ord($ch, 'UTF-8');
+            $gid = $glyphMap[$code] ?? 0;
+            $hex .= sprintf('%04X', $gid);
+        }
+        return $hex;
+    }
+
     private function escPdfString(string $s): string
     {
         // Escape special PDF string characters
@@ -287,6 +372,14 @@ class PdfDocument
         $compressed = gzcompress($ttfData, 9);
         $compLen = strlen($compressed);
         $origLen = strlen($ttfData);
+
+        // ── Build Unicode→glyph map from cmap ──
+        $glyphMap = self::buildGlyphMap($ttfData);
+        if (strpos($pdfFontName, 'Bold') !== false) {
+            $this->glyphMapBold = $glyphMap;
+        } else {
+            $this->glyphMapNormal = $glyphMap;
+        }
 
         // ── FontDescriptor metrics (Noto Sans TC hardcoded) ──
         $ascent = 1160;
