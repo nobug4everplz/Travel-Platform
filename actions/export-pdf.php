@@ -14,6 +14,7 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/trips.php';
 require_once __DIR__ . '/../lib/weather.php';
 require_once __DIR__ . '/../lib/spot-actions.php';
+require_once __DIR__ . '/../lib/trip-photos.php';
 require_once __DIR__ . '/../lib/pdf-export.php';
 
 // ── Validate trip id ──
@@ -51,7 +52,13 @@ if (!empty($trip['address'])) {
 }
 
 // ── Generate PDF ──
-$pdfContent = generate_trip_pdf($trip, $spots, $weatherNow, $weatherForecast);
+$photos = [];
+$spotPhotos = [];
+if (function_exists('get_trip_photos') && function_exists('get_spot_photos_grouped')) {
+    $photos = get_trip_photos($tripId);
+    $spotPhotos = get_spot_photos_grouped($tripId);
+}
+$pdfContent = generate_trip_pdf($trip, $spots, $weatherNow, $weatherForecast, $photos, $spotPhotos);
 
 $filename = rawurlencode($trip['title'] ?? 'itinerary') . '_行程手冊.pdf';
 

@@ -35,6 +35,10 @@ const PDF_MARGIN_R = 20;
 const PDF_MARGIN_T = 25;
 const PDF_MARGIN_B = 20;
 
+/** Embedded CJK TrueType fonts (must exist at PDF generation time) */
+const FONT_REGULAR = __DIR__ . '/fonts/NotoSansTC-Regular.ttf';
+const FONT_BOLD   = __DIR__ . '/fonts/NotoSansTC-Bold.ttf';
+
 // ───────────────────────────────────────────────────────────
 //  PdfDocument class
 // ───────────────────────────────────────────────────────────
@@ -251,46 +255,78 @@ class PdfDocument
         return $s;
     }
 
+    /**
+     * Embed a TrueType font as CIDFontType2 with Identity-H encoding.
+     * Creates: compressed TTF stream, FontDescriptor, CIDFontType2, Type0, ToUnicode CMap.
+     * Returns the Type0 font object number.
+     */
+    private function embedFont(string $ttfPath, string $pdfFontName, float $size): int
+    {
+        $type0ObjNum = $this->allocObjNum();        // Type0 font (used in content stream /F{num})
+        $cidFontObjNum = $this->allocObjNum();       // CIDFontType2
+        $descObjNum = $this->allocObjNum();          // FontDescriptor
+        $fontFileObjNum = $this->allocObjNum();      // Compressed TTF stream (FontFile2)
+        $cmapObjNum = $this->allocObjNum();          // ToUnicode CMap
+
+        // ── Read TTF and compress ──
+        $ttfData = @file_get_contents($ttfPath);
+        if ($ttfData === false) {
+            // Fallback: create a dummy CID font so PDF doesn't break
+            $this->objects[] = "{$fontFileObjNum} 0 obj\n<< /Length 0 >>\nstream\nendstream\nendobj\n";
+            $this->objects[] = "{$descObjNum} 0 obj\n<< /Type /FontDescriptor /FontName /{$pdfFontName} /Flags 4 /FontBBox [0 -200 1000 1000] /ItalicAngle 0 /Ascent 800 /Descent -200 /CapHeight 700 /StemV 76 >>\nendobj\n";
+            $tmp = "{$cidFontObjNum} 0 obj\n<< /Type /Font /Subtype /CIDFontType2 /BaseFont /{$pdfFontName} /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor {$descObjNum} 0 R /DW 1000 >>\nendobj\n";
+            $this->objects[] = $tmp;
+            $tmp = "{$type0ObjNum} 0 obj\n<< /Type /Font /Subtype /Type0 /BaseFont /{$pdfFontName} /Encoding /Identity-H /DescendantFonts [{$cidFontObjNum} 0 R] >>\nendobj\n";
+            $this->objects[] = $tmp;
+            $this->objects[] = "{$cmapObjNum} 0 obj\n<< /Length 0 >>\nstream\nendstream\nendobj\n";
+            return $type0ObjNum;
+        }
+
+        $compressed = gzcompress($ttfData, 9);
+        $compLen = strlen($compressed);
+        $origLen = strlen($ttfData);
+
+        // ── FontDescriptor metrics (Noto Sans TC hardcoded) ──
+        $ascent = 1160;
+        $descent = -288;
+        $capHeight = 733;
+
+        // ── FontFile2: compressed TTF stream ──
+        $ttfObj = "{$fontFileObjNum} 0 obj\n<< /Length {$compLen} /Filter /FlateDecode /Length1 {$origLen} >>\nstream\n{$compressed}\nendstream\nendobj\n";
+        $this->objects[] = $ttfObj;
+
+        // ── FontDescriptor ──
+        $descObj = "{$descObjNum} 0 obj\n<< /Type /FontDescriptor /FontName /{$pdfFontName} /Flags 4 /FontBBox [-1002 -1048 2928 1808] /ItalicAngle 0 /Ascent {$ascent} /Descent {$descent} /CapHeight {$capHeight} /StemV 76 /FontFile2 {$fontFileObjNum} 0 R >>\nendobj\n";
+        $this->objects[] = $descObj;
+
+        // ── CIDFontType2 ──
+        // /DW 1000 = default glyph width for CJK (full-width)
+        $cidFont = "{$cidFontObjNum} 0 obj\n<< /Type /Font /Subtype /CIDFontType2 /BaseFont /{$pdfFontName} /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor {$descObjNum} 0 R /DW 1000 >>\nendobj\n";
+        $this->objects[] = $cidFont;
+
+        // ── Type0 font with Identity-H ──
+        $type0 = "{$type0ObjNum} 0 obj\n<< /Type /Font /Subtype /Type0 /BaseFont /{$pdfFontName} /Encoding /Identity-H /DescendantFonts [{$cidFontObjNum} 0 R] /ToUnicode {$cmapObjNum} 0 R >>\nendobj\n";
+        $this->objects[] = $type0;
+
+        // ── ToUnicode CMap (identity range: CID = Unicode for Identity-H + TrueType) ──
+        $cmapData = "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n1 beginbfrange\n<0000> <FFFF> <0000>\nendbfrange\nendcmap\n";
+        $cmapObj = "{$cmapObjNum} 0 obj\n<< /Length " . strlen($cmapData) . " >>\nstream\n{$cmapData}\nendstream\nendobj\n";
+        $this->objects[] = $cmapObj;
+
+        return $type0ObjNum;
+    }
+
     private function newFontBoldObj(float $size): int
     {
-        $objNum = $this->allocObjNum();
-        $descObjNum = $this->allocObjNum();
-        $this->fontDescBoldObjNum = $descObjNum;
-
-        // CIDFont for CJK (MSungStd-Light — Traditional Chinese)
-        $cidObj = "{$descObjNum} 0 obj\n<< /Type /FontDescriptor /FontName /MSungStd-Light /Flags 4 /FontBBox [-167 -270 1015 934] /ItalicAngle 0 /Ascent 934 /Descent -270 /CapHeight 934 /StemV 76 /Style << /Panose <0000000000000000000000> >> >>\nendobj\n";
-
-        // We need a proper CIDFont object
-        $descendantObjNum = $this->allocObjNum();
-        $descendant = "{$descendantObjNum} 0 obj\n<< /Type /Font /Subtype /CIDFontType2 /BaseFont /MSungStd-Light /CIDSystemInfo << /Registry (Adobe) /Ordering (CNS1) /Supplement 0 >> /FontDescriptor {$descObjNum} 0 R /W [0 [500]] >>\nendobj\n";
-
-        // Type0 font with Identity-H encoding
-        $font = "{$objNum} 0 obj\n<< /Type /Font /Subtype /Type0 /BaseFont /MSungStd-Light /Encoding /Identity-H /DescendantFonts [{$descendantObjNum} 0 R] >>\nendobj\n";
-
-        $this->objects[] = $cidObj;
-        $this->objects[] = $descendant;
-        $this->objects[] = $font;
-
+        $objNum = $this->embedFont(FONT_BOLD, 'NotoSansTC-Bold', $size);
+        $this->fontDescBoldObjNum = $objNum;
         return $objNum;
     }
 
     private function newFontNormalObj(float $size): int
     {
-        $objNum = $this->allocObjNum();
-        $descObjNum = $this->allocObjNum();
-
-        // Same CID font, different object reference for bold vs normal
-        $cidObj = "{$descObjNum} 0 obj\n<< /Type /FontDescriptor /FontName /MSungStd-Light /Flags 4 /FontBBox [-167 -270 1015 934] /ItalicAngle 0 /Ascent 934 /Descent -270 /CapHeight 934 /StemV 76 /Style << /Panose <0000000000000000000000> >> >>\nendobj\n";
-
-        $descendantObjNum = $this->allocObjNum();
-        $descendant = "{$descendantObjNum} 0 obj\n<< /Type /Font /Subtype /CIDFontType2 /BaseFont /MSungStd-Light /CIDSystemInfo << /Registry (Adobe) /Ordering (CNS1) /Supplement 0 >> /FontDescriptor {$descObjNum} 0 R /W [0 [500]] >>\nendobj\n";
-
-        $font = "{$objNum} 0 obj\n<< /Type /Font /Subtype /Type0 /BaseFont /MSungStd-Light /Encoding /Identity-H /DescendantFonts [{$descendantObjNum} 0 R] >>\nendobj\n";
-
-        $this->objects[] = $cidObj;
-        $this->objects[] = $descendant;
-        $this->objects[] = $font;
-
+        $objNum = $this->embedFont(FONT_REGULAR, 'NotoSansTC', $size);
+        $this->fontDescNormalObjNum = $objNum;
         return $objNum;
     }
 
@@ -389,15 +425,45 @@ class PdfDocument
 // ───────────────────────────────────────────────────────────
 
 /**
+ * Resolve a photo path to an accessible file path.
+ * For URLs: downloads to a temp file (caller must unlink $tmpFile).
+ * For local paths: resolves from lib/../uploads/...
+ *
+ * @param string $imagePath  The raw image_path from DB (URL or /uploads/...)
+ * @param string|null &$tmpFile  Set to the temp file path if downloaded
+ * @return string|null  Absolute path to the file, or null if unresolvable
+ */
+function resolvePhotoPath(string $imagePath, ?string &$tmpFile = null): ?string
+{
+    $tmpFile = null;
+    if (filter_var($imagePath, FILTER_VALIDATE_URL)) {
+        $imgData = @file_get_contents($imagePath, false, stream_context_create([
+            'http' => ['timeout' => 10, 'ignore_errors' => true],
+        ]));
+        if ($imgData === false) {
+            return null;
+        }
+        $tmpFile = tempnam(sys_get_temp_dir(), 'photo_');
+        file_put_contents($tmpFile, $imgData);
+        return $tmpFile;
+    }
+    // Local path — resolve relative to lib/fonts/.. = project root
+    $localPath = __DIR__ . '/../' . ltrim($imagePath, '/');
+    return is_file($localPath) ? $localPath : null;
+}
+
+/**
  * Generate an itinerary PDF for a trip.
  *
  * @param array $trip   Trip row (from find_trip / find_visible_trip)
  * @param array $spots  Spot rows (from get_trip_spots)
  * @param array|null $weatherNow   Current weather (from get_weather)
  * @param array|null $weatherForecast  Forecast (from get_forecast)
+ * @param array $photos  Trip-wide photos (from get_trip_photos, for photo wall)
+ * @param array $spotPhotos  Photos keyed by spot_id (from get_spot_photos_grouped)
  * @return string  Raw PDF bytes
  */
-function generate_trip_pdf(array $trip, array $spots, ?array $weatherNow = null, ?array $weatherForecast = null): string
+function generate_trip_pdf(array $trip, array $spots, ?array $weatherNow = null, ?array $weatherForecast = null, array $photos = [], array $spotPhotos = []): string
 {
     $pdf = new PdfDocument();
     $pdf->addPage();
@@ -500,6 +566,25 @@ function generate_trip_pdf(array $trip, array $spots, ?array $weatherNow = null,
                 $pdf->writeLine('   備註：' . $spot['notes'], lineHeight: 5);
             }
 
+            // ── Spot photo thumbnail (40 mm wide) ──
+            $spotId = (int)($spot['id'] ?? 0);
+            if ($spotId > 0 && isset($spotPhotos[$spotId]) && count($spotPhotos[$spotId]) > 0) {
+                $photo = $spotPhotos[$spotId][0];
+                $photoTmp = null;
+                $photoPath = resolvePhotoPath($photo['image_path'], $photoTmp);
+                if ($photoPath !== null) {
+                    // Check for page break
+                    if ($pdf->getCursorY() > $pdf->getPageH() - $pdf->getMarginB() - 35) {
+                        $pdf->addPage();
+                    }
+                    $pdf->image($photoPath, PDF_MARGIN_L, $pdf->getCursorY(), 40, 30);
+                    $pdf->writeLine('', lineHeight: 33);
+                }
+                if ($photoTmp !== null) {
+                    @unlink($photoTmp);
+                }
+            }
+
             // Check if we need a new page
             if ($pdf->getCursorY() > $pdf->getPageH() - $pdf->getMarginB() - 15) {
                 // Close current page and open new one
@@ -508,6 +593,43 @@ function generate_trip_pdf(array $trip, array $spots, ?array $weatherNow = null,
         }
     } else {
         $pdf->writeLine('這個行程尚未新增景點。', lineHeight: 7);
+    }
+
+    // ── Photo Wall (3×3 grid, if photos exist) ──
+    if (count($photos) > 0) {
+        // Check if we can fit the header + a row on the current page
+        if ($pdf->getCursorY() > $pdf->getPageH() - $pdf->getMarginB() - 55) {
+            $pdf->addPage();
+        }
+        $pdf->writeLine('📸 照片牆', bold: true, lineHeight: 9);
+
+        $thumbW = 50;
+        $thumbH = 37;
+        $gap = 5;
+        $cols = 3;
+        $maxPhotos = min(count($photos), 9);
+        $startX = PDF_MARGIN_L;
+
+        for ($i = 0; $i < $maxPhotos; $i++) {
+            $col = $i % $cols;
+            $row = intdiv($i, $cols);
+
+            $x = $startX + $col * ($thumbW + $gap);
+            $y = $pdf->getCursorY() - 3 + $row * ($thumbH + $gap);
+
+            $photoTmp = null;
+            $photoPath = resolvePhotoPath($photos[$i]['image_path'], $photoTmp);
+            if ($photoPath !== null) {
+                $pdf->image($photoPath, $x, $y, $thumbW, $thumbH);
+            }
+            if ($photoTmp !== null) {
+                @unlink($photoTmp);
+            }
+        }
+
+        // Advance past the photo wall
+        $rowsUsed = (int)ceil($maxPhotos / $cols);
+        $pdf->writeLine('', lineHeight: $rowsUsed * ($thumbH + $gap) + 3);
     }
 
     // ── Footer ──
