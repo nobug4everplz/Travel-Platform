@@ -6,7 +6,7 @@ declare(strict_types=1);
  * lib/pdf-export.php — PDF itinerary generation using TCPDF.
  *
  * Requires: composer require tecnickcom/tcpdf
- * Font: cid0ct (Traditional Chinese CID font, built into TCPDF)
+ * Font: Noto Sans TC (converted for TCPDF via addTTFfont)
  */
 
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -54,16 +54,23 @@ function generate_trip_pdf(
     $pdf->setPrintFooter(false);
     $pdf->AddPage();
 
-    // ── CJK font (Traditional Chinese CID, built-in, no external file needed) ──
-    $pdf->SetFont('cid0ct', '', 14);
+    // ── Add custom CJK font (Noto Sans TC, pre-converted for TCPDF) ──
+    $fontFile = __DIR__ . '/fonts/notosanstc.php';
+    if (file_exists($fontFile)) {
+        $fontName = TCPDF_FONTS::addTTFfont($fontFile, 'TrueTypeUnicode', '', 32);
+    } else {
+        $fontName = 'helvetica';
+    }
+    $pdf->SetFont($fontName, '', 14);
+    $fontBold = $fontName;
     $fontSize = 12;
     $fontSmall = 9;
     $lineH = 6;
 
-    $pdf->SetFont('cid0ct', 'B', 18);
+    $pdf->SetFont($fontBold, 'B', 18);
     $pdf->Cell(0, 10, '🗺 ' . ($trip['title'] ?? '行程'), 0, 1, 'L');
 
-    $pdf->SetFont('cid0ct', '', $fontSize);
+    $pdf->SetFont($fontName, '', $fontSize);
     $pdf->Cell(0, $lineH, '規劃師：' . ($trip['author_name'] ?? $trip['author_email'] ?? ''), 0, 1);
 
     $dateStr = '';
@@ -115,9 +122,9 @@ function generate_trip_pdf(
 
     // ── Weather ──
     if ($weatherNow !== null) {
-        $pdf->SetFont('cid0ct', 'B', $fontSize);
+        $pdf->SetFont($fontName, 'B', $fontSize);
         $pdf->Cell(0, $lineH + 1, '☀ 天氣資訊', 0, 1);
-        $pdf->SetFont('cid0ct', '', $fontSize);
+        $pdf->SetFont($fontName, '', $fontSize);
         $desc = $weatherNow['description'] ?? '';
         $desc = preg_replace('/[^\x{0000}-\x{FFFF}]/u', '', $desc);
         $pdf->Cell(0, $lineH, sprintf('目前：%s，%.1f°C', $desc, $weatherNow['temp'] ?? 0), 0, 1);
@@ -138,9 +145,9 @@ function generate_trip_pdf(
     // ── Budget ──
     $budgetAmount = $trip['budget'] ?? null;
     if ($budgetAmount !== null && (float)$budgetAmount > 0) {
-        $pdf->SetFont('cid0ct', 'B', $fontSize);
+        $pdf->SetFont($fontName, 'B', $fontSize);
         $pdf->Cell(0, $lineH + 1, '💰 行程預算', 0, 1);
-        $pdf->SetFont('cid0ct', '', $fontSize);
+        $pdf->SetFont($fontName, '', $fontSize);
         require_once __DIR__ . '/currency.php';
         $tripCurrency = $trip['currency'] ?? 'TWD';
         $destCurrency = guess_destination_currency($trip['address'] ?? null);
@@ -155,15 +162,15 @@ function generate_trip_pdf(
 
     // ── Spots ──
     if (count($spots) > 0) {
-        $pdf->SetFont('cid0ct', 'B', $fontSize);
+        $pdf->SetFont($fontName, 'B', $fontSize);
         $pdf->Cell(0, $lineH + 1, '📍 景點清單', 0, 1);
-        $pdf->SetFont('cid0ct', '', $fontSize);
+        $pdf->SetFont($fontName, '', $fontSize);
 
         foreach ($spots as $idx => $spot) {
             $num = $idx + 1;
-            $pdf->SetFont('cid0ct', 'B', $fontSize);
+            $pdf->SetFont($fontName, 'B', $fontSize);
             $pdf->Cell(0, $lineH + 1, "{$num}. " . ($spot['name'] ?? '未命名景點'), 0, 1);
-            $pdf->SetFont('cid0ct', '', $fontSize);
+            $pdf->SetFont($fontName, '', $fontSize);
 
             if (!empty($spot['address'])) {
                 $pdf->Cell(0, $lineH, '   地址：' . $spot['address'], 0, 1);
@@ -195,7 +202,7 @@ function generate_trip_pdf(
     // ── Photo Wall (3×3 grid) ──
     if (count($photos) > 0) {
         if ($pdf->GetY() > 210) $pdf->AddPage();
-        $pdf->SetFont('cid0ct', 'B', $fontSize);
+        $pdf->SetFont($fontName, 'B', $fontSize);
         $pdf->Cell(0, $lineH + 1, '📸 照片牆', 0, 1);
         $pdf->Ln(2);
 
@@ -227,7 +234,7 @@ function generate_trip_pdf(
 
     // ── Footer ──
     $pdf->Ln(5);
-    $pdf->SetFont('cid0ct', '', $fontSmall);
+    $pdf->SetFont($fontName, '', $fontSmall);
     $pdf->Cell(0, $lineH, '— 由 Travel Platform 自動產生 —', 0, 1, 'C');
 
     return $pdf->Output('', 'S');
