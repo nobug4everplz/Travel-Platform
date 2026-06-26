@@ -151,7 +151,7 @@ function record_login_event(array $user, array $device): void
         client_ip_address(),
         client_user_agent(),
         (int) $device['id'],
-        $device['is_new'] ? true : false,
+        $device['is_new'] ? 'true' : 'false',
     ]);
 }
 
